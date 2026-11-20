@@ -45,7 +45,7 @@
   referrals: each one is a referral credit worth `referralAgreementDiscountPercent` off the service fee
   of one future rent agreement (both tracks). There is no balance column, which is what makes clawback
   whole.
-- **`referral_invites`** (migration 26.11.42) records every invite sent from `POST /me/referrals/invites`
+- **`referral_invites`** records every invite sent from `POST /me/referrals/invites`
   (`referrer_id`, normalised `mobile`, `delivery` of `sent`, `open_whatsapp` or `skipped`, `created_at`),
   including invites silently skipped. It drives the 30-day "already invited" rule, the daily invite cap
   and auto-attribution. Records are kept for up to 12 months. The same migration adds

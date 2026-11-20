@@ -1,5 +1,6 @@
 package com.draazy.api;
 
+import com.draazy.api.common.persistence.FlywayHistoryConsolidation;
 import java.util.Arrays;
 import java.util.Map;
 import org.springframework.boot.SpringApplication;
@@ -28,7 +29,7 @@ public class DraazyApiApplication {
     // Deployed profiles disable Flyway so the serving app never holds the schema-owner credential.
     // The migration job boots Flyway alone and re-enables it above every other property source.
     static ConfigurableApplicationContext migrate(String... args) {
-        return new SpringApplicationBuilder(FlywayAutoConfiguration.class)
+        return new SpringApplicationBuilder(FlywayAutoConfiguration.class, FlywayHistoryConsolidation.class)
                 .web(WebApplicationType.NONE)
                 .initializers(ctx -> ctx.getEnvironment().getPropertySources().addFirst(
                         new MapPropertySource(MIGRATE_ONLY, Map.of("spring.flyway.enabled", "true"))))

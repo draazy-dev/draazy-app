@@ -22,25 +22,7 @@ class MigrationSeedGuardTest {
 
     private static final Path REFERENCE_SEED = MIGRATIONS.resolve("R__DML_seed_reference_data.sql");
 
-    private static final Map<String, String> BACKFILLS = Map.of(
-            "26.10.36",
-            "Inserts one timeline row per held draft it releases; a reset database has no held drafts to release.",
-            "26.10.52",
-            "Copies retired per-post lifestyle tags into user_living_style; a reset database has no posts to copy from.",
-            "26.11.10",
-            "Rebuilds per-day viewer rows from past view signals; a reset database has no signals to rebuild from.",
-            "26.11.30",
-            "Moves tenant groups that already have a flat into rooms; a reset database has no groups to move.",
-            "26.11.32",
-            "Moves owner groups that already have a flat into rooms; a reset database has no groups to move.",
-            "26.10.67",
-            "Inserts the retired untyped pack only so pre-split pack subscriptions can move onto it; a reset "
-                    + "database has no subscriptions to move, and the R__ seed restores the row.",
-            "26.11.36",
-            "Folds pre-chat ticket, review and request threads into one support chat per user; no seed "
-                    + "writes those threads, so a reset database has none to fold.",
-            "26.11.37",
-            "Indexes the same pre-chat threads per subject; a reset database has none to index.");
+    private static final Map<String, String> BACKFILLS = Map.of();
 
     private static final Map<String, String> RE_HOMED_INTO_REFERENCE_SEED = Map.of(
             "message_template",

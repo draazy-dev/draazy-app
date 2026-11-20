@@ -44,7 +44,7 @@ Links go to [`../../system/data-model.md`](../../system/data-model.md).
 - `settings.fees` - read via `GET /pricing`.
 - `contact_requests`, `properties` - read to derive entitlements; `rent_agreements` - read and
   stamped by the renewal sweep.
-- `referrals` (`GET /referrals`) - read. `referral_invites` (migration 26.11.42) - written by
+- `referrals` (`GET /referrals`) - read. `referral_invites` - written by
   `POST /me/referrals/invites`.
 - `BILLING_HISTORY` (static seed constant) - read for the payment-history table.
 
@@ -264,7 +264,7 @@ new codes; older 4-character codes still resolve). `Refer.jsx` reads everything 
     or the send failed synchronously. The client opens the caller's own WhatsApp with the message ready.
   - `422 invalid_mobile`, `422 own_number`, `429 invite_limit` (over `referralInvitesPerDay` in a
     rolling 24 hours), `409` when the `referralRewards` flag is off.
-  - Every invite, sent or silently skipped, is recorded in `referral_invites` (migration 26.11.42) so
+  - Every invite, sent or silently skipped, is recorded in `referral_invites` so
     attribution works. Records are kept for up to 12 months.
   - WhatsApp: a Meta MARKETING template named by `WHATSAPP_REFERRAL_INVITE_TEMPLATE_NAME` (language
     `WHATSAPP_REFERRAL_INVITE_TEMPLATE_LANG`, default `en_US`), sent from

@@ -19,6 +19,9 @@ them back to the owner. Where a task is both, the agent does its part and stops.
   `node scripts/check-comments.mjs --staged`, then `e2e\run-fast.ps1 -Full`.
 - Never `mvnw clean`; never `DROP DATABASE` on `draazy`, `draazy_test`, `draazy_e2e*`.
 - Never edit an applied Flyway migration. The next free slot is in `tasks/NOW.md`.
+- The 26.11 squash (17 domain files) swaps old Flyway history on first migrate. On the first sandbox
+  deploy after it, check the `migrate` job logs `Swapped 84 pre-consolidation history rows`; a
+  pre-squash image cannot migrate the swapped database, so roll back past it only from a backup.
 - Never put a real secret in the repo, a log or a chat message. The owner generates secrets; they
   live only in GitHub environment secrets.
 - Background reading: `docs/DEPLOY.md` (topology, env vars, §7 known blockers, §9 manual checks),

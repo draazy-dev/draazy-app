@@ -16,8 +16,6 @@ import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.security.Roles;
 import com.draazy.api.security.Teams;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -25,7 +23,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
@@ -362,44 +359,6 @@ class SupportChatEndpointsTest extends ServiceFixtures {
     }
 
     @Test
-    @DisplayName("the migration backfill merges open tickets into one and builds the conversation index")
-    void migrationBackfill() throws Exception {
-        User user = customer("9850100023");
-        User desk = staff("9850100024", Teams.RENTAL);
-        String uid = user.getId().toString();
-        Property property = listing(user);
-        String request = raise(user, "rent-agreement", property);
-        jdbc.update("delete from support_conversations");
-        jdbc.execute("drop index uq_support_tickets_open_chat");
-
-        String older = ticketWithMessage(uid, "listing", "open", "older question", user.getId(), "2026-01-01T10:00:00Z");
-        String newer = ticketWithMessage(uid, "other", "waiting", "newer question", user.getId(), "2026-01-02T10:00:00Z");
-        jdbc.update("insert into service_request_messages (id, request_id, author_id, author_role, body, created_at) "
-                + "values (gen_random_uuid(), ?::uuid, ?::uuid, 'staff', 'staff on the request', '2026-01-03T10:00:00Z')",
-                request, desk.getId().toString());
-
-        String migration = migration();
-        String merge = migration.substring(migration.indexOf("CREATE TEMP TABLE chat_merge"),
-                migration.indexOf("DROP INDEX uq_support_tickets_open_about"));
-        jdbc.execute(merge);
-        jdbc.execute(migration.substring(migration.indexOf("INSERT INTO support_conversations")));
-
-        assertThat(jdbc.queryForObject("select status from support_tickets where id = ?::uuid", String.class, older))
-                .isEqualTo("closed");
-        assertThat(jdbc.queryForObject("select status from support_tickets where id = ?::uuid", String.class, newer))
-                .isEqualTo("waiting");
-        assertThat(count("select count(*) from support_ticket_messages where ticket_id = ?::uuid", newer))
-                .isEqualTo(2);
-        assertThat(jdbc.queryForMap("select status, last_from, last_about_type, last_preview, user_unread "
-                + "from support_conversations where user_id = ?::uuid", uid))
-                .containsEntry("status", "answered")
-                .containsEntry("last_from", "staff")
-                .containsEntry("last_about_type", "request")
-                .containsEntry("last_preview", "staff on the request")
-                .containsEntry("user_unread", true);
-    }
-
-    @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @DisplayName("concurrent reads of the chat never conflict")
     void concurrentReadsDoNotConflict() throws Exception {
@@ -557,20 +516,5 @@ class SupportChatEndpointsTest extends ServiceFixtures {
         jdbc.update("insert into support_ticket_messages (ticket_id, author_id, author_role, body) "
                 + "values (?::uuid, ?::uuid, 'buyer', 'this is not me')", id, user.getId().toString());
         return id;
-    }
-
-    private String ticketWithMessage(String userId, String category, String status, String body, UUID author,
-            String at) {
-        String id = jdbc.queryForObject("insert into support_tickets (user_id, subject, category, status, updated_at) "
-                + "values (?::uuid, 'Help', ?, ?, ?::timestamptz) returning id::text", String.class, userId, category,
-                status, at);
-        jdbc.update("insert into support_ticket_messages (ticket_id, author_id, author_role, body, created_at) "
-                + "values (?::uuid, ?::uuid, 'buyer', ?, ?::timestamptz)", id, author.toString(), body, at);
-        return id;
-    }
-
-    private static String migration() throws IOException {
-        return new String(new ClassPathResource("db/migration/26.11.36__DDL_support_conversations.sql")
-                .getContentAsByteArray(), StandardCharsets.UTF_8);
     }
 }

@@ -32,10 +32,10 @@ patch the spec, then update here.
 
 - Location: `backend/src/main/resources/db/migration/`.
 - Naming: `<yy>.<mm>.<seq>__<description>.sql`, no `V` prefix (`spring.flyway.sql-migration-prefix`
-  is empty) — e.g. `26.11.01__DDL_add_saved_searches.sql`; the sequence restarts at `01` each month,
+  is empty) — e.g. `26.12.01__DDL_add_saved_searches.sql`; the sequence restarts at `01` each month,
   every part two digits. `MigrationChainTest` enforces the shape and unique versions.
-- The schema is 14 domain files, `26.10.01__DDL_foundation.sql` … `26.10.14__DDL_flatmate_search.sql`.
-  Never edit a migration that has run; add the next `<yy>.<mm>.<seq>`.
+- The schema is 17 domain files, `26.11.01__DDL_foundation.sql` … `26.11.17__DDL_support_chat.sql`,
+  then the deltas from `26.11.45`. Never edit a migration that has run; add the next `<yy>.<mm>.<seq>`.
 - Enable `pgcrypto` (or `uuid-ossp`) for UUID generation in the first migration.
 - Repeatable migrations (`R__seed_reference_data.sql`) for reference/seed data (localities, plans,
   platform fees) so dev/demo has content.

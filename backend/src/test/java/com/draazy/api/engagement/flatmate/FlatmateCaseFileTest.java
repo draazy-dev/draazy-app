@@ -12,7 +12,6 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -22,7 +21,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
@@ -531,31 +529,6 @@ class FlatmateCaseFileTest extends AbstractApiTest {
 
             assertThat(feedHits("team-up", "Baner", verifiedGroup)).isOne();
             assertThat(feedHits("team-up", "Baner", plainGroup)).isZero();
-        }
-    }
-
-    @Nested
-    @DisplayName("data migration — inline agreement bytes are dropped, the vault reference stays")
-    class Migration {
-        @Test
-        @DisplayName("strips dataUrl from old agreement docs and leaves the rest untouched")
-        void stripsInlineBytes() throws Exception {
-            User author = host("9814000070");
-            String id = createRoom(author, "Baner");
-            jdbc.update("insert into flatmate_reviews (kind, room_id, host_id, tier, status, agreement_doc) "
-                            + "values ('room', ?::uuid, ?, 'tenant', 'pending', "
-                            + "'{\"name\":\"a.pdf\",\"dataUrl\":\"data:application/pdf;base64,AAAA\"}'::jsonb)",
-                    id, author.getId());
-
-            String sql = new ClassPathResource(
-                    "db/migration/26.11.21__DML_flatmate_strip_inline_agreement_bytes.sql")
-                    .getContentAsString(StandardCharsets.UTF_8);
-            jdbc.execute(sql);
-
-            assertThat(jdbc.queryForObject(
-                    "select agreement_doc::text from flatmate_reviews where room_id = ?::uuid",
-                    String.class, id))
-                    .contains("a.pdf").doesNotContain("dataUrl");
         }
     }
 }

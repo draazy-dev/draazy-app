@@ -334,7 +334,7 @@ simultaneous submissions are invisible to each other inside one transaction.
 ### Edit policy (`editPolicy.js`) - the anti bait-and-switch rules
 - **Saved answers:** private owner/staff `formDetails` stores supplementary split address,
   landmark, ownership, rental terms and type-specific answers in `properties.form_details`
-  (JSONB, [catalog listings migration](../../../backend/src/main/resources/db/migration/26.10.04__DDL_catalog_listings.sql)).
+  (JSONB, [catalog listings migration](../../../backend/src/main/resources/db/migration/26.11.04__DDL_catalog_listings.sql)).
   The server validates an allowlist, types and size bounds; media, credentials and verification
   flags do not belong in it. Pincode and headline/carpet/built-up areas stay in canonical columns.
   Prefill preserves saved types, including `false` flags and zero-valued answers, rather than
@@ -669,7 +669,7 @@ One set of rules covers create, owner edit and moderator edit (`ListingSanityLim
 - **Answers the wizard never asks are not stored** (`ListingShape.clearUnaskedAnswers`, shared by create,
   `createOnBehalf` and `ListingEditRules.apply`): no `bhk` on commercial, plot or farm land, and no deposit,
   pets or rent-only form answers (agreement duration, lock-in, notice, food, pets policy, maintenance mode,
-  preferred tenants, fit-out, escalation) on a sale. Migration `26.10.30` cleans existing rows.
+  preferred tenants, fit-out, escalation) on a sale.
 - **Photos** are de-duplicated in first-seen order by the `ListingCreate` / `ListingUpdate` constructors.
 - **Replay guard.** `ListingSubmissionGuard` refuses a create when the same owner has a non-archived listing
   with the same normalised title, address, type, deal and price created in the last 10 minutes:

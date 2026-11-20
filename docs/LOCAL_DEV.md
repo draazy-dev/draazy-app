@@ -42,7 +42,8 @@ The rules, in the order they bite:
    with `Migration checksum mismatch` (this happened on 2026-08-04, and the database was also twenty
    versions behind, so repair was impossible).
 2. **New change → new script, named `<yy>.<mm>.<seq>__<description>.sql`** — e.g.
-   `26.11.01__DDL_add_x.sql`, then `26.11.02__…`; the sequence restarts at `01` each month. There is
+   `26.12.01__DDL_add_x.sql`, then `26.12.02__…`; the sequence restarts at `01` each month (November
+   continues at `26.11.46`). There is
    no `V` prefix (`spring.flyway.sql-migration-prefix` is empty). Never renumber, never reuse, and keep
    every part two digits: Flyway compares versions numerically, so `26.10.1` and `26.10.01` collide.
 3. **Never truncate or drop the schema to get out of trouble.** If a migration is wrong, write the
@@ -51,22 +52,33 @@ The rules, in the order they bite:
    checksum changes and always after every versioned script, which is what makes editing the demo
    catalogue a one-file change rather than a new migration.
 
-The chain has been flattened twice. On 2026-09-01 the 127-file `V1..V128` chain became 14
+The chain has been flattened three times. On 2026-09-01 the 127-file `V1..V128` chain became 14
 domain-grouped files. On 2026-10-13 the `V01..V129` chain (15 domain files plus 110 deltas, and the
-pending society-community drop) was folded into the 14 files `26.10.01__DDL_foundation.sql` …
-`26.10.14__DDL_flatmate_search.sql`, and the naming moved to `<yy>.<mm>.<seq>__`. Both times every
-environment was rebuilt from empty, which is rule 1 again.
+pending society-community drop) was folded into 14 files `26.10.01` … `26.10.14`, and the naming
+moved to `<yy>.<mm>.<seq>__`. Those two times every environment was rebuilt from empty, which is
+rule 1 again.
+
+On 2026-11-19 the 84 files `26.10.01` … `26.11.44` were folded into 17 domain files
+`26.11.01__DDL_foundation.sql` … `26.11.17__DDL_support_chat.sql`; `26.11.45` onwards stays as is.
+This time nothing is rebuilt: `FlywayHistoryConsolidation` runs before `migrate()` (normal boots and
+`--migrate-only`) and, on a database whose history is exactly the old 84 rows (checked against a
+SHA-256 of their versions and checksums), rewrites those rows into the 17 new ones in one locked
+transaction, keeping every `R__` and later row. Any other partial or failed old history refuses to
+boot with "drop and recreate this database"; for an e2e shard that means
+`DROP DATABASE draazy_e2e_shN WITH (FORCE)`, and `run-fast.ps1` recreates it. An image built before
+the squash cannot migrate a swapped database, so roll back past it only by restoring a backup.
 
 Equivalence was proved by replaying the old and new chains into scratch databases and comparing
-`pg_dump --schema-only` and seeded reference data: identical except five `trg_set_updated_at`
-triggers the old chain never installed on tables it created late (`identity_verifications`,
-`conversation_user_state`, `property_verification_override_requests`,
-`service_request_draft_approvals`, `service_request_draft_checks`). Every `ALTER TABLE` is folded
+`pg_dump --schema-only` and seeded reference data: identical, schema and data, for the 2026-11 fold;
+the 2026-10 fold differed only by five `trg_set_updated_at` triggers the old chain never installed
+on tables it created late (`identity_verifications`, `conversation_user_state`,
+`property_verification_override_requests`, `service_request_draft_approvals`,
+`service_request_draft_checks`). Every `ALTER TABLE` is folded
 into its `CREATE TABLE` (columns in the same physical order), objects the chain created and later
 dropped are never created, and the backfill DML is gone: every statement of it repaired rows that
 only exist in an already-populated database.
 
-Rule 1 still binds: the 14 files are applied everywhere, so they are as frozen as the old chain was.
+Rule 1 still binds: the 17 files are applied everywhere, so they are as frozen as the old chain was.
 A future squash is possible on the same precondition.
 
 Two build-time guards:
@@ -235,10 +247,10 @@ o.f.core.internal.command.DbValidate : Successfully validated 17 migrations
 c.draazy.api.DraazyApiApplication : Started DraazyApiApplication
 ```
 
-That count is the 14 versioned `26.10.*__DDL_*` files plus the two `R__DML_*` reference seeds, and on
-`local`/`e2e` the repeatables from `db/seed` and friends. On a database already at 26.10.14 the line
-reads *validated*; on an empty one you get `Migrating schema "public" to version
-"26.10.14 - DDL flatmate search"` followed by `Successfully applied N migrations`.
+That count is the versioned files plus the two `R__DML_*` reference seeds, and on
+`local`/`e2e` the repeatables from `db/seed` and friends. On an up-to-date database the line
+reads *validated*; on an empty one you get `Migrating schema "public" to version …` followed by
+`Successfully applied N migrations`.
 
 If Flyway logs *nothing at all*, the `spring-boot-flyway` autoconfiguration module is missing from
 `pom.xml`. Under Spring Boot 4, `flyway-core` alone is not enough.

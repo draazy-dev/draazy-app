@@ -338,7 +338,7 @@ The single decision point every supply path calls - group create, single-room po
 ### Moderation (`mod_status`, D72)
 - Rooms and **groups with a flat** are created **`mod_status = 'pending'`** and are invisible on the
   public board until a moderator publishes them (`approved`). Backend default is set in the entity
-  *and* in the column default (`26.10.12__DDL_flatmates.sql`, folded from the old `V41`), so a row
+  *and* in the column default (`26.11.12__DDL_flatmates.sql`), so a row
   inserted by any route - API, migration, manual SQL - is held.
 - **Owner tier skips the wait.** `FlatmatePublication.stateFor` makes an unflagged room or
   group whose host demonstrably owns the flat (an approved listing they own) `live` at create:
@@ -690,7 +690,7 @@ other.
 A tenant room needs `ownerConsentMobile`, and the caller's own number is refused (`owner_consent_self`).
 The tick box is only the tenant's word, so after commit the owner gets a WhatsApp template
 (`owner-notice-template-name`, params: tenant first name, place, link) with a one-tap link to
-`/owner-confirm#<token>`. Only the token's SHA-256 is stored (`flatmate_owner_notices`, 26.10.47). The
+`/owner-confirm#<token>`. Only the token's SHA-256 is stored (`flatmate_owner_notices`). The
 fragment never reaches a server; `OwnerConfirm.jsx` scrubs it and sends it as `X-Owner-Notice-Token` on
 `GET /flatmates/owner-notice` and `POST /flatmates/owner-notice/answer`.
 
@@ -712,7 +712,7 @@ fragment never reaches a server; `OwnerConfirm.jsx` scrubs it and sends it as `X
 
 On agree, the owner's number gets an account (`UserService.provisionUnverified`, audited as `owner-link`; an
 archived account is never revived and none is made while signups are off). The flat is saved to it as a private
-managed property (`source_room_id`, `address_fingerprint`, 26.10.48), one per owner and flat however many rooms in
+managed property (`source_room_id`, `address_fingerprint`), one per owner and flat however many rooms in
 it are confirmed. A failure here is logged and the consent still stands. The page tells the owner, before and after
 the tap, that the home goes to a free account on their number; `homeSaved` drives the "See your home" link.
 

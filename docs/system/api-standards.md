@@ -223,7 +223,7 @@ is a 500 on the pay button because somebody mistyped a config value in the back 
   not money but how many rewards one account can mint without anyone looking — an arbitrarily large
   number switches the fraud desk off.
 - **`referralQualifyPerMonth` is 3 a month, with `referralQualifyPerYear` at 10** (product
-  decision 2026-11-08; migration 26.11.44 moves stored values). Each reward is worth real money off an
+  decision 2026-11-08). Each reward is worth real money off an
   agreement fee, so the cap is tight. Past it, a qualification is rejected as `cap_reached`. It is
   configuration rather than a constant because a fraud threshold has to be movable on the day it is
   wrong: a deployment change, not a release.

@@ -13,11 +13,9 @@ import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.security.Roles;
 import com.draazy.api.security.Teams;
-import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
@@ -192,41 +190,6 @@ class SupportChatScopeTest extends ServiceFixtures {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.scope.full").value(false))
                 .andExpect(jsonPath("$.scope.contexts").value(containsInAnyOrder("flatmate", "identity", "invoice")));
-    }
-
-    @Test
-    @DisplayName("the topic backfill builds one row per context and lifts the conversation to awaiting")
-    void topicBackfill() throws Exception {
-        User user = customer("9850200022");
-        User desk = staff("9850200023", Teams.RENTAL);
-        String uid = user.getId().toString();
-        String request = raise(user, "rent-agreement", listing(user));
-        jdbc.update("delete from support_conversation_topics");
-        jdbc.update("delete from support_conversations");
-        String ticket = jdbc.queryForObject("insert into support_tickets (user_id, subject, category, status, "
-                + "staff_unread) values (?::uuid, 'Help', 'other', 'open', true) returning id::text", String.class, uid);
-        jdbc.update("insert into support_ticket_messages (ticket_id, author_id, author_role, body, created_at) "
-                + "values (?::uuid, ?::uuid, 'buyer', 'general question', '2026-01-01T10:00:00Z')", ticket, uid);
-        jdbc.update("insert into service_request_messages (id, request_id, author_id, author_role, body, created_at) "
-                + "values (gen_random_uuid(), ?::uuid, ?::uuid, 'staff', 'staff on the request', "
-                + "'2026-01-03T10:00:00Z')", request, desk.getId().toString());
-        jdbc.update("insert into support_conversations (user_id, status, last_at) values (?::uuid, 'answered', now())",
-                uid);
-
-        String sql = new String(new ClassPathResource(
-                "db/migration/26.11.37__DDL_support_conversation_topics.sql").getContentAsByteArray(),
-                StandardCharsets.UTF_8);
-        jdbc.execute(sql.substring(sql.indexOf("INSERT INTO support_conversation_topics")));
-
-        assertThat(jdbc.queryForMap("select status, staff_unread, last_from from support_conversation_topics "
-                + "where user_id = ?::uuid and about_type = 'general' and about_id = ''", uid))
-                .containsEntry("status", "awaiting").containsEntry("staff_unread", true)
-                .containsEntry("last_from", "user");
-        assertThat(jdbc.queryForMap("select status, staff_unread, last_from from support_conversation_topics "
-                + "where user_id = ?::uuid and about_type = 'request' and about_id = ?", uid, request))
-                .containsEntry("status", "answered").containsEntry("staff_unread", false)
-                .containsEntry("last_from", "staff");
-        assertThat(conversationStatus(user)).isEqualTo("awaiting");
     }
 
     private User scoped(String mobile, String... functions) {

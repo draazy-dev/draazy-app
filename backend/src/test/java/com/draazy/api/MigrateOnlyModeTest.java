@@ -2,6 +2,7 @@ package com.draazy.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.draazy.api.common.persistence.FlywayHistoryConsolidation;
 import java.util.Arrays;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
@@ -25,7 +26,8 @@ class MigrateOnlyModeTest {
             assertThat(ctx.getBean(Flyway.class).info().pending()).isEmpty();
             assertThat(ctx).isNotInstanceOf(WebServerApplicationContext.class);
             assertThat(Arrays.stream(ctx.getBeanDefinitionNames()).map(ctx::getType)
-                            .filter(type -> type != null && type.getName().startsWith("com.draazy")))
+                            .filter(type -> type != null && type.getName().startsWith("com.draazy")
+                                    && !type.getName().startsWith(FlywayHistoryConsolidation.class.getName())))
                     .as("the job must not boot the app's beans, which need the serving secrets")
                     .isEmpty();
         }
