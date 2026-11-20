@@ -72,6 +72,7 @@ public class OriginGateFilter extends OncePerRequestFilter {
                 ErrorCodes.Messages.ACCESS_DENIED);
     }
 
+    // Safe only after the secret check: the edge proxy overwrites X-Forwarded-For with CF-Connecting-IP.
     private static HttpServletRequest edgeAddressed(HttpServletRequest request) {
         String forwarded = request.getHeader(WriteRateLimitFilter.FORWARDED_FOR);
         String client = forwarded == null ? "" : forwarded.split(",", 2)[0].trim();

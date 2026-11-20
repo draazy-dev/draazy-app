@@ -4,6 +4,7 @@ import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.common.error.OtpIncorrectException;
 import com.draazy.api.common.error.RateLimitedException;
 import com.draazy.api.common.error.UnauthorizedException;
+import com.draazy.api.identity.verification.IdentityHasher;
 import com.draazy.api.provider.OtpSender;
 import com.draazy.api.security.LocalProfileGuard;
 import jakarta.annotation.PostConstruct;
@@ -39,8 +40,10 @@ public class OtpService {
 
     private final int maxVerifyAttempts;
 
+    private final IdentityHasher hasher;
+
     public OtpService(OtpCodeRepository repository, OtpSender sender, OtpSendBudget budget,
-            Environment environment,
+            Environment environment, IdentityHasher hasher,
             @Value("${draazy.otp.fixed-code:}") String fixedCode,
             @Value("${draazy.otp.sandbox-code:}") String sandboxCode,
             @Value("${draazy.otp.max-verify-attempts:" + DEFAULT_MAX_VERIFY_ATTEMPTS + "}")
@@ -49,6 +52,7 @@ public class OtpService {
         this.sender = sender;
         this.budget = budget;
         this.environment = environment;
+        this.hasher = hasher;
         this.fixedCode = fixedCode == null ? "" : fixedCode.trim();
         this.sandboxCode = sandboxCode == null ? "" : sandboxCode.trim();
         this.maxVerifyAttempts = maxVerifyAttempts;
@@ -143,7 +147,7 @@ public class OtpService {
         String code = preset.isEmpty()
                 ? String.format("%06d", RANDOM.nextInt(1_000_000))
                 : preset;
-        repository.save(new OtpCode(mobile, Tokens.sha256Hex(code), purpose,
+        repository.save(new OtpCode(mobile, hasher.otpHash(code), purpose,
                 Instant.now().plus(TTL), requestedBy));
 
         sender.send(mobile, code);
@@ -171,7 +175,9 @@ public class OtpService {
                     "Too many attempts — request a new code", 0);
         }
 
-        if (!Tokens.hashesEqual(Tokens.sha256Hex(code), otp.getCodeHash())) {
+        // TODO: drop the sha256 branch once no code issued before the HMAC switch can be live (5 min TTL).
+        if (!Tokens.hashesEqual(hasher.otpHash(code), otp.getCodeHash())
+                && !Tokens.hashesEqual(Tokens.sha256Hex(code), otp.getCodeHash())) {
             otp.recordAttempt();
 
             throw new OtpIncorrectException(maxVerifyAttempts - otp.getAttempts());

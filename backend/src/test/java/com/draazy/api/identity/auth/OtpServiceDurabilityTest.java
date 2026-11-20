@@ -85,6 +85,27 @@ class OtpServiceDurabilityTest {
     }
 
     @Test
+    void theStoredHashIsKeyedSoADumpCannotBeReversedByEnumeratingCodes() {
+        otpService.sendLoginCode(MOBILE);
+
+        String stored = jdbc.queryForObject(
+                "select code_hash from otp_codes where mobile = ?", String.class, MOBILE);
+        assertThat(stored).isNotEqualTo(Tokens.sha256Hex(otp.lastCode));
+        otpService.verifyLoginCode(MOBILE, otp.lastCode);
+    }
+
+    @Test
+    void aCodeIssuedBeforeTheHmacSwitchStillVerifies() {
+        otpService.sendLoginCode(MOBILE);
+        jdbc.update("update otp_codes set code_hash = ? where mobile = ?",
+                Tokens.sha256Hex(otp.lastCode), MOBILE);
+
+        otpService.verifyLoginCode(MOBILE, otp.lastCode);
+        assertThat(jdbc.queryForObject("select consumed from otp_codes where mobile = ?",
+                Boolean.class, MOBILE)).isTrue();
+    }
+
+    @Test
     void failedAttemptsAccumulateAcrossTransactionsUntilTheCapTrips() {
         otpService.sendLoginCode(MOBILE);
         String wrong = "000000".equals(otp.lastCode) ? "111111" : "000000";

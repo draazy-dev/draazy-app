@@ -41,6 +41,7 @@ public class StaffSignInService {
     private final StaffCredentialRepository credentials;
     private final StaffTotpCipher cipher;
     private final StaffSignInChallenges challenges;
+    private final StaffSignInDecoyLocks decoyLocks;
     private final PasswordEncoder passwordEncoder;
     private final PlatformSettings platformSettings;
     private final AuthService auth;
@@ -49,13 +50,15 @@ public class StaffSignInService {
     private final String fixedCode;
 
     public StaffSignInService(UserRepository users, StaffCredentialRepository credentials,
-            StaffTotpCipher cipher, StaffSignInChallenges challenges, PasswordEncoder passwordEncoder,
+            StaffTotpCipher cipher, StaffSignInChallenges challenges, StaffSignInDecoyLocks decoyLocks,
+            PasswordEncoder passwordEncoder,
             PlatformSettings platformSettings, AuthService auth, Environment environment,
             @Value("${draazy.staff-totp.fixed-code:}") String fixedCode) {
         this.users = users;
         this.credentials = credentials;
         this.cipher = cipher;
         this.challenges = challenges;
+        this.decoyLocks = decoyLocks;
         this.passwordEncoder = passwordEncoder;
         this.platformSettings = platformSettings;
         this.auth = auth;
@@ -79,10 +82,12 @@ public class StaffSignInService {
         User user = users.findByEmailIgnoreCaseAndArchivedFalse(request.email()).orElse(null);
         String hash = user != null && user.getPasswordHash() != null ? user.getPasswordHash() : DUMMY_BCRYPT;
         boolean passwordMatches = passwordEncoder.matches(request.password(), hash);
+        Instant now = Instant.now();
         if (user == null || user.getPasswordHash() == null || !Roles.isBackOffice(user.getRole())) {
+            refuseIfLocked(decoyLocks.lockedUntil(request.email(), now), now);
+            decoyLocks.recordFailure(request.email(), now);
             throw invalidCredentials();
         }
-        Instant now = Instant.now();
         StaffCredential credential = credentialOf(user.getId());
         refuseIfLocked(credential, now);
         if (!passwordMatches) {
@@ -214,7 +219,13 @@ public class StaffSignInService {
 
     private static void refuseIfLocked(StaffCredential credential, Instant now) {
         if (credential.isLocked(now)) {
-            long seconds = Math.max(1, Duration.between(now, credential.getLockedUntil()).toSeconds());
+            refuseIfLocked(credential.getLockedUntil(), now);
+        }
+    }
+
+    private static void refuseIfLocked(Instant lockedUntil, Instant now) {
+        if (lockedUntil != null) {
+            long seconds = Math.max(1, Duration.between(now, lockedUntil).toSeconds());
             throw new RateLimitedException(ErrorCodes.STAFF_SIGN_IN_LOCKED,
                     "Too many failed attempts. Sign-in for this account is paused for "
                             + Math.ceilDiv(seconds, 60) + " minute(s).", (int) seconds);

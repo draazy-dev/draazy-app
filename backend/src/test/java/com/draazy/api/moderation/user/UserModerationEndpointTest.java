@@ -16,8 +16,6 @@ import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -638,7 +636,7 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 UPDATE otp_codes SET code_hash = ?
                 WHERE id = (SELECT id FROM otp_codes WHERE mobile = ?
                             ORDER BY created_at DESC LIMIT 1)""",
-                sha256Hex("424242"), mobile);
+                otpHash("424242"), mobile);
 
         em.clear();
         return mvc.perform(post(Routes.Auth.LOGIN)
@@ -647,15 +645,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andReturn().getResponse();
     }
 
-    private static String sha256Hex(String value) throws Exception {
-        byte[] digest = MessageDigest.getInstance("SHA-256")
-                .digest(value.getBytes(StandardCharsets.UTF_8));
-        StringBuilder hex = new StringBuilder(digest.length * 2);
-        for (byte b : digest) {
-            hex.append("%02x".formatted(b));
-        }
-        return hex.toString();
-    }
 
     @Test
     @DisplayName("days limits the directory to people who joined in the last N IST days")

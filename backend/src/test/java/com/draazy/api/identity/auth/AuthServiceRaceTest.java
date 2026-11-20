@@ -74,7 +74,8 @@ class AuthServiceRaceTest {
 
         StaffSignInService service = new StaffSignInService(users,
                 mock(StaffCredentialRepository.class), mock(StaffTotpCipher.class),
-                mock(StaffSignInChallenges.class), passwordEncoder, mock(PlatformSettings.class),
+                mock(StaffSignInChallenges.class), new StaffSignInDecoyLocks(), passwordEncoder,
+                mock(PlatformSettings.class),
                 mock(AuthService.class), mock(org.springframework.core.env.Environment.class), "");
 
         assertThatThrownBy(() -> service.checkPassword(new StaffLoginRequest("missing@draazy.in", "any-pass")))

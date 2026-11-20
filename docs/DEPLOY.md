@@ -198,7 +198,7 @@ there is no separate secret store.
 | `CASHFREE_WEBHOOK_SECRET` | Cashfree signs callbacks with `x-client-secret` and issues no separate webhook secret, so this **is** `CASHFREE_SECRET_KEY`; the spec points both at one value so they cannot drift when one is rotated. A drifted-but-non-blank value passes every startup check and rejects every callback; a blank one makes every forged signature valid. That one credential therefore also carries order-creation and refund authority |
 | `CASHFREE_NOTIFY_URL` | `https://sandbox.draazy.com/api/webhooks/cashfree/payment`. Blank falls back to the endpoint registered in the Cashfree dashboard, which holds one address across every environment, so each deployment sets its own |
 | `WEB_ORIGINS`, `API_PUBLIC_ORIGIN` | see §1; public literals in the spec |
-| `APP_BASE_URL` | the SPA origin, or the logged bootstrap link points at `draazy.com` |
+| `APP_BASE_URL` | the SPA origin, or the bootstrap invite link points at `draazy.com` |
 | `INTERNAL_PROXIES`, `ORIGIN_SHARED_SECRET` | see §4; the secret is ≥ 32 characters and the **same** value as the Pages secret. `none` turns the gate off, which is right only for an instance nothing proxies |
 | `ZEPTOMAIL_*`, `WHATSAPP_*`, `TURNSTILE_*`, `PUSH_VAPID_*` | §3.1 and §3.3 |
 | `STORAGE_ENABLED`, `R2_ENDPOINT`, `R2_BUCKET_PRIVATE`, `R2_BUCKET_PUBLIC`, `R2_PUBLIC_BASE_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | photo and document upload. Without them `R2FileStorage` is not wired and uploads throw. With `STORAGE_ENABLED=true` all six `R2_*` must be non-blank (the workflow checks), because a blank one makes `R2FileStorage`'s all-six constructor check refuse to boot |
@@ -216,19 +216,19 @@ Optional first-admin bootstrap variables:
 
 | Variable | Notes |
 |---|---|
-| `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_MOBILE` | When no live admin exists, startup creates that admin and logs a one-hour `/staff-invite#...` link |
+| `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_MOBILE` | When no live admin exists, startup creates that admin and emails a one-hour `/staff-invite#...` link to `BOOTSTRAP_ADMIN_EMAIL`. Only with `ZEPTOMAIL_ENABLED=false` (local, e2e) is the link logged instead, since a logged admin invite is a takeover for anyone with log access |
 | `BOOTSTRAP_ADMIN_NAME` | Defaults to `Administrator` |
-| `BOOTSTRAP_ADMIN_RECOVER` | Break-glass nonce. Set a fresh random value and redeploy to reset the configured admin's 2FA, revoke sessions and log a fresh one-hour invite. If no admin holds the email, it adopts the live admin with the configured mobile and **no** email — how the seeded sandbox admin (`9000000000`) gets one |
+| `BOOTSTRAP_ADMIN_RECOVER` | Break-glass nonce. Set a fresh random value and redeploy to reset the configured admin's 2FA, revoke sessions and email a fresh one-hour invite. If no admin holds the email, it adopts the live admin with the configured mobile and **no** email — how the seeded sandbox admin (`9000000000`) gets one |
 
 The deploy reads them from the `sandbox` GitHub environment: **secrets** `SANDBOX_BOOTSTRAP_ADMIN_EMAIL`
 and `SANDBOX_BOOTSTRAP_ADMIN_MOBILE` (variables would print in the public run log), and **variable**
 `SANDBOX_BOOTSTRAP_ADMIN_RECOVER`; blank = off. Set them there: the spec is rendered from them on every deploy,
 so a value added by hand in the DigitalOcean console is overwritten.
 
-First deploy: set the email and mobile, deploy, open the `[ADMIN BOOTSTRAP]` link from the `api` runtime
-logs within 1 hour and set the password, then sign in at `/staff-login`, scan the QR code and save the
-recovery codes. Break glass: change `SANDBOX_BOOTSTRAP_ADMIN_RECOVER` to a new random value, redeploy and
-open the new logged link within 1 hour.
+First deploy: set the email and mobile, deploy, open the emailed invite link within 1 hour and set the
+password (the `api` runtime log shows `[ADMIN BOOTSTRAP] Invite emailed to ***@domain`), then sign in at
+`/staff-login`, scan the QR code and save the recovery codes. Break glass: change
+`SANDBOX_BOOTSTRAP_ADMIN_RECOVER` to a new random value, redeploy and open the new emailed link within 1 hour.
 
 Staff/manager invites need no SMS or email sender. The Team screen returns the one-time link to the
 creator, who shares it privately; manager-created staff invites also notify the administrator in-app.
@@ -696,7 +696,7 @@ ShedLock is needed.
 | Group | Cron property (default) | Jobs |
 |---|---|---|
 | Frequent | `draazy.jobs.frequent.cron` (`0 */15 * * * *`) | `abandoned-checkouts`, `pass-refunds`, `listing-duplicates`, `staff-sla` |
-| Hourly | `draazy.jobs.hourly.cron` (`0 5 * * * *`) | `subscription-expiry`, `saved-search-counts`, `page-view-rollup`, `flatmate-post-expiry` (public reads don't check `active_until`, so a lapsed post shows until it runs), `photo-webp-backfill` (20 legacy photos an hour; an original that won't decode is skipped until restart) |
+| Hourly | `draazy.jobs.hourly.cron` (`0 5 * * * *`) | `subscription-expiry`, `saved-search-counts`, `page-view-rollup`, `rate-limit-counter-retention`, `flatmate-post-expiry` (public reads don't check `active_until`, so a lapsed post shows until it runs), `photo-webp-backfill` (20 legacy photos an hour; an original that won't decode is skipped until restart) |
 | Nightly, 00:00 | `draazy.jobs.nightly.cron` (`0 0 0 * * *`) | silent cleanup: `refresh-tokens`, `referral-signal-retention`, `co-fill-invite-retention`, `service-request-identity-retention`, `notification-retention`, `page-view-retention`, `error-event-retention`, `audit-log-retention`, `provider-call-retention`, `otp-retention`, `outbound-message-retention`, `listing-content-purge`, `photo-upload-sweep`, `photo-delete-retry` (listing photos whose R2 delete failed, from `photo_storage_deletes`, 500 a night, least-tried first), `flatmate-owner-notice-purge`, `identity-image-purge`, `identity-delete-retry`, `identity-conflict-retention` |
 | Daytime, 10:00 | `draazy.jobs.daytime.cron` (`0 0 10 * * *`) | anything that messages a user: `identity-pending-expiry`, `contact-returns`, `referral-holds`, `needs-info`, `flatmate-owner-tier`, `flatmate-agreement-expiry`, `flatmate-draazy-agreements`, `flatmate-post-reminders`, `renewal-reminders`, `lease-end-reminders`, `tracked-rent-reminders`, `waiting-digest` |
 

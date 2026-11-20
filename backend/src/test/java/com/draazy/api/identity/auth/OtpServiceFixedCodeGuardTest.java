@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
+import com.draazy.api.identity.verification.IdentityHasher;
 import com.draazy.api.provider.OtpSender;
 import com.draazy.api.security.LocalProfileGuard;
 import org.junit.jupiter.api.DisplayName;
@@ -144,7 +145,8 @@ class OtpServiceFixedCodeGuardTest {
 
     private static void capGuardAt(int maxVerifyAttempts) {
         new OtpService(mock(OtpCodeRepository.class), mock(OtpSender.class),
-                mock(OtpSendBudget.class), new MockEnvironment(), "", "", maxVerifyAttempts)
+                mock(OtpSendBudget.class), new MockEnvironment(), new IdentityHasher("test-secret"), "", "",
+                maxVerifyAttempts)
                 .rejectUnusableAttemptCap();
     }
 
@@ -155,6 +157,7 @@ class OtpServiceFixedCodeGuardTest {
                 mock(OtpSender.class),
                 mock(OtpSendBudget.class),
                 environment,
+                new IdentityHasher("test-secret"),
                 fixedCode,
                 sandboxCode,
                 OtpService.DEFAULT_MAX_VERIFY_ATTEMPTS);

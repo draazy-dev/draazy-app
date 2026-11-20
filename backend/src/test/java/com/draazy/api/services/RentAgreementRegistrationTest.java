@@ -171,9 +171,9 @@ class RentAgreementRegistrationTest extends ServiceFixtures {
 
     private void forceDraftOtp(String id) {
         em.flush();
-        jdbc.update("update otp_codes set code_hash = encode(sha256(convert_to('424242', 'UTF8')), 'hex')"
+        jdbc.update("update otp_codes set code_hash = ?"
                 + " where id = (select id from otp_codes where purpose like ? order by created_at desc limit 1)",
-                "draft-approval:" + id + ":%");
+                otpHash("424242"), "draft-approval:" + id + ":%");
         em.clear();
     }
 

@@ -97,7 +97,7 @@ class StaffInviteTest extends AbstractApiTest {
                 UPDATE otp_codes SET code_hash = ?
                 WHERE id = (SELECT id FROM otp_codes WHERE mobile = ?
                             ORDER BY created_at DESC LIMIT 1)""",
-                sha256Hex("424242"), mobile);
+                otpHash("424242"), mobile);
         em.clear();
         return mvc.perform(post(Routes.Auth.LOGIN)
                         .contentType(MediaType.APPLICATION_JSON)

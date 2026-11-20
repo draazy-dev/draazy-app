@@ -337,16 +337,18 @@
 - **What the server keeps.** The TOTP secret is AES-256-GCM encrypted under `STAFF_TOTP_KEY`; recovery
   codes are SHA-256 hashes. The last accepted time step is stored, so a code cannot be replayed inside
   its window. Five misses — wrong passwords or wrong codes — lock the account for 15 minutes (429
-  `staff_sign_in_locked`). An expired or tampered challenge is 401 `staff_sign_in_expired`, and the
+  `staff_sign_in_locked`); an email with no staff account locks identically, so the 429 confirms
+  nothing. An expired or tampered challenge is 401 `staff_sign_in_expired`, and the
   screen restarts at the password.
 - **Recovery is a back-office manager's job.** Admin › Team has *Reset 2FA* (next sign-in re-enrols) and
   *Reissue invite* (voids the open invite and returns a one-time `/staff-invite#...` link to the
   creator; the account cannot sign in until it is redeemed). Managers can do this for staff only; admin
   actions are audited, and manager actions also notify the administrator.
 - **There is one administrator per environment.** First deploy sets `BOOTSTRAP_ADMIN_EMAIL`,
-  `BOOTSTRAP_ADMIN_MOBILE` and optionally `BOOTSTRAP_ADMIN_NAME`; startup logs a one-hour
-  `/staff-invite#...` link for that account. Break-glass recovery sets `BOOTSTRAP_ADMIN_RECOVER` to a
-  fresh nonce and redeploys: startup resets that admin's 2FA, revokes sessions and logs a fresh link.
+  `BOOTSTRAP_ADMIN_MOBILE` and optionally `BOOTSTRAP_ADMIN_NAME`; startup emails a one-hour
+  `/staff-invite#...` link to that address (it is logged only when email is off, locally and in e2e).
+  Break-glass recovery sets `BOOTSTRAP_ADMIN_RECOVER` to a fresh nonce and redeploys: startup resets
+  that admin's 2FA, revokes sessions and emails a fresh link.
 - **Role and team are not a choice made in the browser.** The server returns the authenticated account's
   own role and team and this screen obeys them; every API call behind the console is authorised
   server-side regardless of what the page believes.
@@ -370,8 +372,10 @@
   neither screen can drift on what counts as an in-app path.
 
 ### Session persistence (`src/lib/auth.js`)
-- **Keys:** `draazyUser` (the cached profile) and `draazyTokens` (the 15-minute access token).
-  Registration is server-side, on first verified login.
+- **Keys:** `draazyUser` (the cached profile). The 15-minute access token is held in module memory
+  only, never in web storage; a reload or new tab re-mints it from the refresh cookie before first
+  render (`main.jsx`). A legacy `draazyTokens` entry is adopted once and deleted, which is also how the
+  e2e harness seeds a session. Registration is server-side, on first verified login.
 - **The refresh token is not here.** It is set by the server as an `HttpOnly; Secure; SameSite=Lax`
   cookie named `__Host-draazy_rt` at `Path=/`, so no script on the page can read it. The `__Host-`
   prefix is load-bearing: it makes the browser *enforce* host-only scoping, so no other host under the
@@ -425,9 +429,8 @@
 > **The browser holds a cache, not a session.** The credential is a rotating refresh token
 > (hashed server-side in `refresh_tokens`, 30d) plus a 15-minute access JWT; the OTP is real,
 > and identity, roles and permissions are all resolved by the server.
-> What sits in `localStorage` is a plain, user-editable JSON blob and the short-lived access token.
-> The long-lived half is out of reach of any script on the page, so an XSS that reads storage steals
-> at most fifteen minutes rather than a month.
+> What sits in `localStorage` is a plain, user-editable JSON blob; the short-lived access token lives
+> only in memory and the long-lived half is `HttpOnly`, so an XSS that reads storage steals neither.
 
 ### Client transport: 401 recovery, refresh coalescing and sign-out
 

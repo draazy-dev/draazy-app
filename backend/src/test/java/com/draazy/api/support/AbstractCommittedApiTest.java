@@ -2,6 +2,7 @@ package com.draazy.api.support;
 
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
+import com.draazy.api.identity.verification.IdentityHasher;
 import com.draazy.api.security.JwtService;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,6 +37,13 @@ public abstract class AbstractCommittedApiTest {
 
     @Autowired
     private TransactionTemplate tx;
+
+    @Autowired
+    private IdentityHasher identityHasher;
+
+    protected String otpHash(String code) {
+        return identityHasher.otpHash(code);
+    }
 
     private final List<UUID> userIds = new ArrayList<>();
 

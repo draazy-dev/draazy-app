@@ -173,7 +173,7 @@ public class UserAdminController {
             @NotBlank String role, List<String> functions) {
     }
 
-    public record UserPatchRequest(@Size(max = 80) String name, @Email @Size(max = 254) String email, String avatar) {
+    public record UserPatchRequest(@Size(max = 80) String name, @Email @Size(max = 254) String email, @Size(max = 2048) String avatar) {
     }
 
     public record ReasonBody(String reason) {

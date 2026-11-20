@@ -178,6 +178,18 @@ class WebPushSenderTest {
         assertThat(requests).hasValue(0);
     }
 
+    @Test
+    @DisplayName("an endpoint whose host does not resolve is not sent to, and its subscription is kept")
+    void unresolvableHostIsSkippedNotDropped() {
+        WebPushSender strict = new WebPushSender(props(null), JsonMapper.builder().build(),
+                HttpClient.newHttpClient(), WebPushSender::isPublicHttps);
+
+        assertThat(strict.send("https://no-such-push-host.invalid/x",
+                WebPushCrypto.encode(WebPushCrypto.uncompressed(browser.getPublic())),
+                WebPushCrypto.encode(browserAuth), PushPayloads.messageReceived(UUID.randomUUID()))).isTrue();
+        assertThat(requests).hasValue(0);
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"http://fcm.googleapis.com/fcm/send/x", "https://127.0.0.1/x", "https://localhost/x",
             "https://169.254.169.254/latest", "https://10.0.0.5/x", "https://[::1]/x", "https://[fd00::1]/x",

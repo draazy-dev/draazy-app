@@ -38,6 +38,11 @@ public class IdentityHasher {
         return hmac("challenge:" + payload);
     }
 
+    // A six-digit code under plain SHA-256 is a million-entry lookup table from a leaked dump.
+    public String otpHash(String code) {
+        return hmac("otp:" + code);
+    }
+
     private String hmac(String input) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");

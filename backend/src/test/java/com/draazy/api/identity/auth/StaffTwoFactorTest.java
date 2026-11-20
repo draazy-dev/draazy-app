@@ -225,6 +225,25 @@ class StaffTwoFactorTest extends AbstractApiTest {
     }
 
     @Test
+    @DisplayName("an address with no staff account locks exactly like one, so a 429 confirms nothing")
+    void unknownEmailLocksLikeAStaffAccount() throws Exception {
+        backOffice(Roles.Wire.STAFF, "9866050016", "real-staff@example.com");
+        for (String email : List.of("nobody-here@example.com", "real-staff@example.com")) {
+            for (int i = 0; i < 5; i++) {
+                mvc.perform(post(Routes.Auth.STAFF_LOGIN).contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"email\":\"%s\",\"password\":\"guess-%d\"}".formatted(email, i)))
+                        .andExpect(status().isUnauthorized());
+            }
+            mvc.perform(post(Routes.Auth.STAFF_LOGIN).contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"%s\",\"password\":\"guess-5\"}".formatted(email)))
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(jsonPath("$.error").value("staff_sign_in_locked"))
+                    .andExpect(jsonPath("$.message").value(
+                            "Too many failed attempts. Sign-in for this account is paused for 15 minute(s)."));
+        }
+    }
+
+    @Test
     @DisplayName("wrong passwords count toward the same lock")
     void wrongPasswordsCountTowardTheLock() throws Exception {
         backOffice(Roles.Wire.STAFF, "9866050005", "guessed@example.com");
@@ -274,7 +293,7 @@ class StaffTwoFactorTest extends AbstractApiTest {
         jdbc.update("""
                 UPDATE otp_codes SET code_hash = ?
                 WHERE id = (SELECT id FROM otp_codes WHERE mobile = ? ORDER BY created_at DESC LIMIT 1)""",
-                Tokens.sha256Hex("424242"), mobile);
+                otpHash("424242"), mobile);
         em.clear();
 
         mvc.perform(post(Routes.Auth.LOGIN).contentType(MediaType.APPLICATION_JSON)

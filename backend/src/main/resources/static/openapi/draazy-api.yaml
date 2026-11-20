@@ -210,7 +210,8 @@ paths:
         off, checked *after* the password so the refusals cannot be told apart by anyone who has not
         passed it. Administrators are exempt from that flag. Five consecutive misses (password or
         code) lock the account for 15 minutes: while locked, every attempt on that account answers
-        **429** `staff_sign_in_locked`, whatever the password.
+        **429** `staff_sign_in_locked`, whatever the password. An address with no staff account locks
+        the same way, so the 429 does not confirm one exists.
       requestBody:
         required: true
         content:

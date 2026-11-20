@@ -13,8 +13,6 @@ import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -78,7 +76,7 @@ class FlatmateOwnerConsentEndpointsTest extends AbstractApiTest {
                 UPDATE otp_codes SET code_hash = ?
                 WHERE id = (SELECT id FROM otp_codes WHERE mobile = ?
                             ORDER BY created_at DESC LIMIT 1)""",
-                sha256Hex("424242"), ownerMobile);
+                otpHash("424242"), ownerMobile);
         em.clear();
     }
 
@@ -97,18 +95,6 @@ class FlatmateOwnerConsentEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.resendAfterSeconds").doesNotExist());
     }
 
-    private static String sha256Hex(String raw) {
-        try {
-            byte[] d = MessageDigest.getInstance("SHA-256").digest(raw.getBytes(StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder(d.length * 2);
-            for (byte b : d) {
-                sb.append(Character.forDigit((b >> 4) & 0xF, 16)).append(Character.forDigit(b & 0xF, 16));
-            }
-            return sb.toString();
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
-    }
 
     @Test
     @DisplayName("the first call sends a code, the second writes a consent with no group")

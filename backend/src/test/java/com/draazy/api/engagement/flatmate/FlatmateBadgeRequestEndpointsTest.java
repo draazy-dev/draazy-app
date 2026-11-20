@@ -21,12 +21,9 @@ import com.draazy.api.support.AbstractApiTest;
 import com.draazy.api.support.UploadedPhotos;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -180,7 +177,7 @@ class FlatmateBadgeRequestEndpointsTest extends AbstractApiTest {
         jdbc.update("""
                 update otp_codes set code_hash = ?
                 where id = (select id from otp_codes where mobile = ? order by created_at desc limit 1)""",
-                sha256Hex("424242"), mobile);
+                otpHash("424242"), mobile);
         entityManager.clear();
         mvc.perform(post(Routes.Flatmates.OWNER_CONSENT)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
@@ -189,10 +186,6 @@ class FlatmateBadgeRequestEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isOk());
     }
 
-    private static String sha256Hex(String raw) throws Exception {
-        return HexFormat.of().formatHex(
-                MessageDigest.getInstance("SHA-256").digest(raw.getBytes(StandardCharsets.UTF_8)));
-    }
 
     @Test
     @DisplayName("files a pending review and flips only the badge fields, leaving publication alone")

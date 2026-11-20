@@ -21,6 +21,8 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Component
 public class AdminBootstrap implements ApplicationRunner {
@@ -35,31 +37,36 @@ public class AdminBootstrap implements ApplicationRunner {
     private final RefreshTokenService refreshTokens;
     private final JdbcTemplate jdbc;
     private final EntityManager em;
+    private final EmailSender mailer;
     private final String email;
     private final String mobile;
     private final String name;
     private final String recover;
     private final String baseUrl;
+    private final boolean mailEnabled;
 
     public AdminBootstrap(UserRepository users, StaffInviteService invites,
             StaffSignInService staffSignIn, RefreshTokenService refreshTokens,
-            JdbcTemplate jdbc, EntityManager em,
+            JdbcTemplate jdbc, EntityManager em, EmailSender mailer,
             @Value("${draazy.bootstrap.admin.email:}") String email,
             @Value("${draazy.bootstrap.admin.mobile:}") String mobile,
             @Value("${draazy.bootstrap.admin.name:Administrator}") String name,
             @Value("${draazy.bootstrap.admin.recover:}") String recover,
-            @Value("${draazy.app.base-url}") String baseUrl) {
+            @Value("${draazy.app.base-url}") String baseUrl,
+            @Value("${draazy.providers.zeptomail.enabled:false}") boolean mailEnabled) {
         this.users = users;
         this.invites = invites;
         this.staffSignIn = staffSignIn;
         this.refreshTokens = refreshTokens;
         this.jdbc = jdbc;
         this.em = em;
+        this.mailer = mailer;
         this.email = blankToEmpty(email);
         this.mobile = blankToEmpty(mobile);
         this.name = blankToEmpty(name).isBlank() ? "Administrator" : name.trim();
         this.recover = blankToEmpty(recover);
         this.baseUrl = blankToEmpty(baseUrl).replaceAll("/+$", "");
+        this.mailEnabled = mailEnabled;
     }
 
     @Override
@@ -89,7 +96,7 @@ public class AdminBootstrap implements ApplicationRunner {
         user.setMobileVerified(true);
         User saved = users.saveAndFlush(user);
         String token = invites.issueToken(saved.getId(), saved.getId(), INVITE_TTL);
-        logInvite(token);
+        deliverInvite(saved.getEmail(), token);
     }
 
     private void recoverAdmin() {
@@ -103,7 +110,7 @@ public class AdminBootstrap implements ApplicationRunner {
         staffSignIn.resetSecondFactor(admin.getId());
         String token = invites.reissueToken(admin.getId(), admin.getId(), INVITE_TTL);
         jdbc.update("INSERT INTO admin_bootstrap_runs (nonce) VALUES (?)", recover);
-        logInvite(token);
+        deliverInvite(admin.getEmail(), token);
     }
 
     private User adminToRecover(String normalisedEmail) {
@@ -165,9 +172,23 @@ public class AdminBootstrap implements ApplicationRunner {
         return count != null && count > 0;
     }
 
-    private void logInvite(String token) {
-        log.warn("[ADMIN BOOTSTRAP] Open {}/staff-invite#{} within 1 hour to set the administrator password.",
-                baseUrl, token);
+    // A log line holding a live admin invite would let anyone with log access take the account,
+    // so the link is only logged where there is no real mailer (local and e2e).
+    private void deliverInvite(String to, String token) {
+        String link = baseUrl + "/staff-invite#" + token;
+        if (!mailEnabled) {
+            log.warn("[ADMIN BOOTSTRAP] Open {} within 1 hour to set the administrator password.", link);
+            return;
+        }
+        String text = "Open this link within 1 hour to set the Draazy administrator password:\n\n" + link
+                + "\n\nThe link works once. If you did not expect this email, ignore it.\n";
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                mailer.send(to, "Set your Draazy administrator password", text);
+            }
+        });
+        log.warn("[ADMIN BOOTSTRAP] Invite emailed to {}; it expires in 1 hour.", EmailSender.maskAddress(to));
     }
 
     private void holdBootstrapUntilCommit() {

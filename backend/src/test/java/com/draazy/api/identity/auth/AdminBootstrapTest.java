@@ -4,11 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
+import com.draazy.api.provider.EmailSender;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +20,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @ExtendWith(OutputCaptureExtension.class)
 @DisplayName("Single administrator bootstrap")
@@ -34,8 +39,13 @@ class AdminBootstrapTest extends AbstractApiTest {
     EntityManager em;
 
     private AdminBootstrap bootstrap(String email, String mobile, String name, String recover) {
-        return new AdminBootstrap(users, invites, staffSignIn, refreshTokens, jdbc, em,
-                email, mobile, name, recover, "http://localhost:5173");
+        return bootstrap(email, mobile, name, recover, false, (to, subject, text) -> { });
+    }
+
+    private AdminBootstrap bootstrap(String email, String mobile, String name, String recover,
+            boolean mailEnabled, EmailSender mailer) {
+        return new AdminBootstrap(users, invites, staffSignIn, refreshTokens, jdbc, em, mailer,
+                email, mobile, name, recover, "http://localhost:5173", mailEnabled);
     }
 
     private void run(AdminBootstrap bootstrap) {
@@ -69,6 +79,22 @@ class AdminBootstrapTest extends AbstractApiTest {
         assertThat(expiresAt).isBetween(Instant.now().plusSeconds(55 * 60),
                 Instant.now().plusSeconds(65 * 60));
         assertThat(output.getAll()).contains("[ADMIN BOOTSTRAP] Open http://localhost:5173/staff-invite#");
+    }
+
+    @Test
+    @DisplayName("with live email the invite link is mailed after commit and never logged")
+    void invitesByEmailWhenMailIsLive(CapturedOutput output) {
+        List<String> sent = new ArrayList<>();
+        run(bootstrap("Mailed@Example.com", "9866043012", "Founder", "", true,
+                (to, subject, text) -> sent.add(to + "\n" + text)));
+
+        assertThat(sent).isEmpty();
+        TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
+
+        assertThat(sent).singleElement().asString()
+                .startsWith("mailed@example.com\n")
+                .contains("http://localhost:5173/staff-invite#", "1 hour");
+        assertThat(output.getAll()).doesNotContain("/staff-invite#").contains("***@example.com");
     }
 
     @Test

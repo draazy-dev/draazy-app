@@ -16,9 +16,6 @@ import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractCommittedApiTest;
 import com.draazy.api.support.IdentityCases;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.util.HexFormat;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -209,8 +206,7 @@ class FlatmateStaleWriteTest extends AbstractCommittedApiTest {
         mvc.perform(post(Routes.Flatmates.OWNER_CONSENT).header(HttpHeaders.AUTHORIZATION, bearer(host))
                 .contentType(MediaType.APPLICATION_JSON).content(consent.formatted(ownerMobile, "")));
         jdbc.update("update otp_codes set code_hash = ? where id = (select id from otp_codes where mobile = ? "
-                + "order by created_at desc limit 1)", HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                        .digest("424242".getBytes(StandardCharsets.UTF_8))), ownerMobile);
+                + "order by created_at desc limit 1)", otpHash("424242"), ownerMobile);
 
         int status = race(
                 () -> jdbc.queryForList("select id from flatmate_rooms where id = ?::uuid for update", roomId),

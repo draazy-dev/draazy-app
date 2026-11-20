@@ -1,6 +1,7 @@
 package com.draazy.api.support;
 
 import com.draazy.api.identity.user.User;
+import com.draazy.api.identity.verification.IdentityHasher;
 import com.draazy.api.security.BackOfficeFunctions;
 import com.draazy.api.security.JwtService;
 import com.draazy.api.security.Roles;
@@ -30,6 +31,13 @@ public abstract class AbstractApiTest {
 
     @Autowired
     protected JdbcTemplate jdbc;
+
+    @Autowired
+    private IdentityHasher identityHasher;
+
+    protected String otpHash(String code) {
+        return identityHasher.otpHash(code);
+    }
 
     private static final List<String> COMMON_LOCALITIES = commonLocalities();
 

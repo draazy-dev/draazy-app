@@ -8,6 +8,7 @@ import com.draazy.api.identity.auth.OtpCode;
 import com.draazy.api.identity.auth.OtpCodeRepository;
 import com.draazy.api.identity.auth.OtpSendBudget;
 import com.draazy.api.identity.auth.OtpService;
+import com.draazy.api.identity.verification.IdentityHasher;
 import com.draazy.api.provider.OtpSender;
 import com.draazy.api.support.Races;
 import java.util.List;
@@ -76,7 +77,7 @@ class RateLimitRaceTest {
     void otpSendsCannotOverspendTheWindowBudget() {
         OtpService tightBudget = new OtpService(otpCodes, otpSender,
                 new OtpSendBudget(otpCodes, locks, 0, 2, 500, 500, 500, 500),
-                environment, "", "", 3);
+                environment, new IdentityHasher("test-secret"), "", "", 3);
 
         tx.executeWithoutResult(status ->
                 tightBudget.sendSelfServiceCode(OTP_MOBILE, OtpCode.PURPOSE_LOGIN));
@@ -106,7 +107,7 @@ class RateLimitRaceTest {
                 "insert into users (mobile) values (?) returning id", UUID.class, CALLER_MOBILE);
         OtpService wideBudget = new OtpService(otpCodes, otpSender,
                 new OtpSendBudget(otpCodes, locks, 0, 500, 500, 500, 500, 500),
-                environment, "", "", 3);
+                environment, new IdentityHasher("test-secret"), "", "", 3);
 
         List<Throwable> outcomes = Races.run(3, index ->
                 tx.executeWithoutResult(status -> wideBudget.sendCode(recipient(index),

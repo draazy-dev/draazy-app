@@ -84,6 +84,22 @@ class UserProfileUpdateTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.name").value("New Name"));
     }
 
+    @Test
+    @DisplayName("oversized email, city and avatar are rejected")
+    void freeTextFieldsAreBounded() throws Exception {
+        User user = user("Old Name", false);
+        for (String body : new String[] {
+                "{\"email\":\"" + "a".repeat(64) + "@" + ("b".repeat(49) + ".").repeat(4) + "test\"}",
+                "{\"city\":\"" + "P".repeat(81) + "\"}",
+                "{\"avatar\":\"https://x.test/" + "a".repeat(2048) + "\"}"}) {
+            mvc.perform(patch(Routes.Auth.ME)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(user))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isUnprocessableEntity());
+        }
+    }
+
     private ResultActions patchGender(User user, String gender)
             throws Exception {
         return patchGender(user, gender, false);

@@ -7,9 +7,9 @@ import jakarta.validation.constraints.Size;
 public record UserUpdate(
 
         @Size(min = 2, max = 80) @Pattern(regexp = "\\p{L}[\\p{L}\\p{M} .'-]*") String name,
-        @Email String email,
-        String avatar,
-        String city,
+        @Email @Size(max = 254) String email,
+        @Size(max = 2048) String avatar,
+        @Size(max = 80) String city,
         @Pattern(regexp = "male|female") String gender,
         Boolean changeGender,
         Boolean hideNumber,
