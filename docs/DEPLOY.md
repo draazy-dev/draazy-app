@@ -238,7 +238,7 @@ creator, who shares it privately; manager-created staff invites also notify the 
 Sandbox sends real, random OTPs through WhatsApp exactly like prod: `do-app-sandbox.yaml` sets
 `WHATSAPP_ENABLED=true`, the business number's `WHATSAPP_PHONE_NUMBER_ID` and the approved
 `draazy_login_otp` / `draazy_identity_decision` templates, and the deploy workflow passes the System User
-token from the GitHub repository secret **`WHATSAPP_ACCESS_TOKEN`** (shared with prod: one Meta app) (the deploy fails
+token from the GitHub repository secret **`SANDBOX_WHATSAPP_ACCESS_TOKEN`** (Meta app `draazy-sandbox`; prod uses its own app `draazy-prod`) (the deploy fails
 fast while it is empty). Every send is billed to the Meta prepaid balance and only reaches mobiles
 registered on WhatsApp, so seeded demo mobiles cannot sign in — use your own number.
 
@@ -254,7 +254,7 @@ carry it into production. `application-prod.properties` also pins the key empty.
 Sandbox also enforces Turnstile on the code send and both waitlists (`TURNSTILE_ENABLED=true`). Create a
 widget in Cloudflare → Turnstile for the sandbox hostname, then add its secret key as the `sandbox`
 repository secret **`SANDBOX_TURNSTILE_SECRET_KEY`** and its site key as the repository variable
-**`VITE_TURNSTILE_SITE_KEY`**. The deploy stops before anything ships while either is empty, because the
+**`SANDBOX_VITE_TURNSTILE_SITE_KEY`**. The deploy stops before anything ships while either is empty, because the
 API would refuse every sign-in from a bundle without the widget. Sign in once by hand after the first
 rollout: the health check cannot catch a mismatched key pair or a widget missing the sandbox hostname.
 Turnstile is not optional here: with `WHATSAPP_ENABLED=true` the `sandbox` and `prod` profiles refuse to
@@ -415,8 +415,8 @@ every non-OTP template; START opts it back in. A `failed` delivery lands in the 
 | Setting | Value |
 |---|---|
 | Callback URL (Meta App ▸ WhatsApp ▸ Configuration) | `https://<host>/api/webhooks/whatsapp`, subscribed to the `messages` field |
-| `WHATSAPP_APP_SECRET` | Meta App ▸ Settings ▸ Basic ▸ App secret (`WHATSAPP_APP_SECRET`, shared); signs every callback |
-| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | 16+ random characters you choose, typed into Meta too (`WHATSAPP_WEBHOOK_VERIFY_TOKEN`, shared) |
+| `WHATSAPP_APP_SECRET` | Meta App ▸ Settings ▸ Basic ▸ App secret (`SANDBOX_WHATSAPP_APP_SECRET`; prod: `PROD_WHATSAPP_APP_SECRET` from `draazy-prod`); signs every callback |
+| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | 16+ random characters you choose, typed into Meta too (`SANDBOX_WHATSAPP_WEBHOOK_VERIFY_TOKEN`; prod has its own) |
 
 Set both or neither: one without the other, or a token under 16 characters, fails the boot. Unset, the
 route answers 404. Meta delivers real callbacks only to a published app (Draazy's is, since 2026-10-27).
@@ -429,7 +429,7 @@ route answers 404. Meta delivers real callbacks only to a published app (Draazy'
 | `PUSH_VAPID_PRIVATE_KEY` | Secret (`SANDBOX_PUSH_VAPID_PRIVATE_KEY`). Boot fails if it is set without the public key or is not a P-256 key |
 | `PUSH_VAPID_PUBLIC_KEY` | The matching public key (`SANDBOX_PUSH_VAPID_PUBLIC_KEY`) |
 | `PUSH_VAPID_SUBJECT` | Contact the push services may use; `mailto:` or https. Default `mailto:noreply@draazy.com` |
-| `VITE_VAPID_PUBLIC_KEY` | Repository variable consumed by the frontend build, carrying the **same public key**, so browsers subscribe to it |
+| `VITE_VAPID_PUBLIC_KEY` | Frontend build value from repository variable `SANDBOX_VITE_VAPID_PUBLIC_KEY`, carrying the **same public key**, so browsers subscribe to it |
 
 Rotating the pair invalidates every stored subscription: they are removed as the push service answers
 404/410 or they re-subscribe.
@@ -626,7 +626,7 @@ the first's backend.
 
 | Job | What it does |
 |---|---|
-| `gate` | Rejects a mistyped confirmation; decides which halves run; requires `VITE_TURNSTILE_SITE_KEY` |
+| `gate` | Rejects a mistyped confirmation; decides which halves run; requires `SANDBOX_VITE_TURNSTILE_SITE_KEY` |
 | `backend` (env `sandbox`) | Builds `backend/Dockerfile` on an amd64 runner and pushes it to GHCR tagged with the commit SHA; fails if any required secret is empty; renders the spec with `envsubst`; `doctl apps create --spec … --wait` (or `update <id>` when an app named `draazy-api-sandbox` exists); requires the latest deployment to be `ACTIVE`; smoke-tests `/api/actuator/health` on the default ingress (12 attempts); deletes the rendered spec |
 | `frontend-build` | `npm ci` and `npm run build` with the `VITE_*` inputs below; verifies `dist/index.html`, `404.html`, `_redirects`, `_headers`, `functions/api/[[path]].js` and the face model exist; uploads `dist/` and `functions/` as a one-day artifact |
 | `frontend-publish` | `wrangler pages deploy dist --project-name draazy --branch main`, tagged with the same SHA; then a smoke test through `sandbox.draazy.com` (deep links, security headers, no CORS grant, `/api/actuator/health` returns JSON `UP`) |
@@ -655,9 +655,9 @@ tell those apart.
 
 | Scope | Secrets | Variables |
 |---|---|---|
-| repository (backend) | `DIGITALOCEAN_ACCESS_TOKEN`, `SANDBOX_JWT_SECRET`, `SANDBOX_ORIGIN_SHARED_SECRET`, `SANDBOX_REFERRAL_SIGNAL_SALT`, `SANDBOX_IDENTITY_HASH_SECRET`, `SANDBOX_STAFF_TOTP_KEY`, `SANDBOX_IDENTITY_ENCRYPTION_KEY`, `SANDBOX_CASHFREE_APP_ID`, `SANDBOX_CASHFREE_SECRET_KEY`, `SANDBOX_ZEPTOMAIL_API_KEY`, `SANDBOX_ZEPTOMAIL_WEBHOOK_KEY`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, `SANDBOX_TURNSTILE_SECRET_KEY`, `SANDBOX_R2_ACCESS_KEY_ID`, `SANDBOX_R2_SECRET_ACCESS_KEY`, `SANDBOX_GOOGLE_PLACES_SERVER_KEY`, `SANDBOX_PUSH_VAPID_PRIVATE_KEY`, `SANDBOX_PUSH_VAPID_PUBLIC_KEY`, `SANDBOX_BOOTSTRAP_ADMIN_EMAIL`, `SANDBOX_BOOTSTRAP_ADMIN_MOBILE` | `SANDBOX_R2_ENDPOINT`, `SANDBOX_R2_BUCKET_PRIVATE`, `SANDBOX_R2_BUCKET_PUBLIC`, `SANDBOX_R2_PUBLIC_BASE_URL`, `SANDBOX_BOOTSTRAP_ADMIN_RECOVER` (blank = off) |
+| repository (backend) | `DIGITALOCEAN_ACCESS_TOKEN`, `SANDBOX_JWT_SECRET`, `SANDBOX_ORIGIN_SHARED_SECRET`, `SANDBOX_REFERRAL_SIGNAL_SALT`, `SANDBOX_IDENTITY_HASH_SECRET`, `SANDBOX_STAFF_TOTP_KEY`, `SANDBOX_IDENTITY_ENCRYPTION_KEY`, `SANDBOX_CASHFREE_APP_ID`, `SANDBOX_CASHFREE_SECRET_KEY`, `SANDBOX_ZEPTOMAIL_API_KEY`, `SANDBOX_ZEPTOMAIL_WEBHOOK_KEY`, `SANDBOX_WHATSAPP_ACCESS_TOKEN`, `SANDBOX_WHATSAPP_APP_SECRET`, `SANDBOX_WHATSAPP_WEBHOOK_VERIFY_TOKEN`, `SANDBOX_TURNSTILE_SECRET_KEY`, `SANDBOX_R2_ACCESS_KEY_ID`, `SANDBOX_R2_SECRET_ACCESS_KEY`, `SANDBOX_GOOGLE_PLACES_SERVER_KEY`, `SANDBOX_PUSH_VAPID_PRIVATE_KEY`, `SANDBOX_PUSH_VAPID_PUBLIC_KEY`, `SANDBOX_BOOTSTRAP_ADMIN_EMAIL`, `SANDBOX_BOOTSTRAP_ADMIN_MOBILE` | `SANDBOX_R2_ENDPOINT`, `SANDBOX_R2_BUCKET_PRIVATE`, `SANDBOX_R2_BUCKET_PUBLIC`, `SANDBOX_R2_PUBLIC_BASE_URL`, `SANDBOX_BOOTSTRAP_ADMIN_RECOVER` (blank = off) |
 | repository (frontend publish) | `CLOUDFLARE_API_TOKEN` (Account → Cloudflare Pages → Edit, nothing else) | `CLOUDFLARE_ACCOUNT_ID` |
-| repository (frontend build) | `VITE_GOOGLE_MAPS_API_KEY`, `VITE_GA_ID` | `VITE_GOOGLE_MAPS_MAP_ID`, `VITE_CASHFREE_MODE`, `VITE_PMF_MODE`, `VITE_VAPID_PUBLIC_KEY`, `VITE_TURNSTILE_SITE_KEY`, `VITE_POSTHOG_KEY` (US-cloud project key; blank = off), `VITE_POSTHOG_APP_URL` |
+| repository (frontend build) | `SANDBOX_VITE_GOOGLE_MAPS_API_KEY`, `SANDBOX_VITE_GA_ID` | `VITE_GOOGLE_MAPS_MAP_ID` (shared map style), `SANDBOX_VITE_CASHFREE_MODE`, `SANDBOX_VITE_PMF_MODE`, `SANDBOX_VITE_VAPID_PUBLIC_KEY`, `SANDBOX_VITE_TURNSTILE_SITE_KEY`, `SANDBOX_VITE_POSTHOG_KEY` (US-cloud project `draazy-sandbox`; blank = off), `SANDBOX_VITE_POSTHOG_APP_URL` |
 
 The workflow fails fast when any `sandbox` value except the three bootstrap ones is empty. The four R2
 values and `SANDBOX_BOOTSTRAP_ADMIN_RECOVER` are variables because they are identifiers; the R2 key pair
@@ -823,10 +823,10 @@ the listing; it must render from the public bucket URL.
    gh variable set SANDBOX_R2_BUCKET_PUBLIC -R draazy-dev/draazy-app --body 'draazy-sandbox-public'
    ```
 
-4. Secret `CLOUDFLARE_API_TOKEN`, variable `CLOUDFLARE_ACCOUNT_ID`, and the `VITE_*` secrets and variables.
+4. Secret `CLOUDFLARE_API_TOKEN`, variable `CLOUDFLARE_ACCOUNT_ID`, and the `SANDBOX_VITE_*` secrets and variables.
 5. Set `SANDBOX_ORIGIN_SHARED_SECRET` once and reuse the same value for the Pages secret in §6.5.
 6. Cloudflare → Turnstile: create the sandbox widget and set `SANDBOX_TURNSTILE_SECRET_KEY` /
-   `VITE_TURNSTILE_SITE_KEY` (§3.1).
+   `SANDBOX_VITE_TURNSTILE_SITE_KEY` (§3.1).
 
 ### 6.4 First backend deploy
 

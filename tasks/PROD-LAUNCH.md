@@ -176,17 +176,19 @@ The agent prepares the lists; the owner does the clicks.
   - `PROD_ORIGIN_SHARED_SECRET` (>= 32 chars; the same value goes into the prod Pages `ORIGIN_SHARED_SECRET`)
   - `PROD_CASHFREE_APP_ID`, `PROD_CASHFREE_SECRET_KEY` (**live** keys); `CASHFREE_WEBHOOK_SECRET`
     gets the same value as the secret key
-  - WhatsApp: none. One Meta app, number and template set serve both envs, so the shared
-    `WHATSAPP_ACCESS_TOKEN` (**System User** token), `WHATSAPP_APP_SECRET` and
-    `WHATSAPP_WEBHOOK_VERIFY_TOKEN` are reused; copy the phone number ID and template names from the sandbox spec
+  - `PROD_WHATSAPP_ACCESS_TOKEN` (**System User** token for Meta app `draazy-prod`),
+    `PROD_WHATSAPP_APP_SECRET`, `PROD_WHATSAPP_WEBHOOK_VERIFY_TOKEN`. Both apps share one WABA, so the
+    phone number ID and template names are copied from the sandbox spec
   - `PROD_ZEPTOMAIL_*`, including the webhook key
   - `PROD_BOOTSTRAP_ADMIN_EMAIL`, `PROD_BOOTSTRAP_ADMIN_MOBILE`
   - `PROD_GOOGLE_PLACES_SERVER_KEY`, R2 credentials
   - `WEB_ORIGINS` = `https://draazy.com` **only** (security pass 2: do not include sandbox)
   - `API_PUBLIC_ORIGIN`, `INTERNAL_PROXIES` = the DO load balancer's real CIDR (`DEPLOY.md` §4;
     **not** `none`, or every visitor shares one rate-limit bucket)
-  - Vars: `VITE_TURNSTILE_SITE_KEY` (prod), `VITE_GOOGLE_MAPS_API_KEY` (prod),
-    `VITE_GOOGLE_MAPS_MAP_ID`, `VITE_POSTHOG_KEY`, `VITE_POSTHOG_APP_URL`, `TURNSTILE_ENABLED=true`
+  - Frontend build: secrets `PROD_VITE_GOOGLE_MAPS_API_KEY` (referrer `draazy.com/*`), `PROD_VITE_GA_ID`;
+    variables `PROD_VITE_TURNSTILE_SITE_KEY`, `PROD_VITE_VAPID_PUBLIC_KEY`, `PROD_VITE_CASHFREE_MODE=production`,
+    `PROD_VITE_PMF_MODE`, `PROD_VITE_POSTHOG_KEY` and `PROD_VITE_POSTHOG_APP_URL` (PostHog project `draazy-prod`);
+    shared `VITE_GOOGLE_MAPS_MAP_ID`. Backend `TURNSTILE_ENABLED=true`
 - [ ] **3.2 [OWNER] DigitalOcean:** a Managed PostgreSQL 17 cluster in `blr` with a standby node,
   daily backups and PITR, trusted sources = the prod app only, a schema-owner user plus the runtime
   role (`app-runtime-role.sql`). Create the prod app from `do-app-prod.yaml`. Add the alert policies and
@@ -202,9 +204,9 @@ The agent prepares the lists; the owner does the clicks.
 - [ ] **3.5 [OWNER] Meta / WhatsApp:**
   - Add a **spend cap** on the billing account **before** enabling WhatsApp on prod (`DEPLOY.md` §7).
   - Make sure the OTP, agreement-invite and referral-invite templates are Active.
-  - Move the webhook callback from sandbox to `https://draazy.com/api/webhooks/whatsapp` (same verify
-    token), subscribe `messages`. Meta allows one callback per number, so sandbox stops receiving
-    opt-outs and failed-delivery statuses from then on.
+  - In app `draazy-prod`, set the callback `https://draazy.com/api/webhooks/whatsapp` with
+    `PROD_WHATSAPP_WEBHOOK_VERIFY_TOKEN` and subscribe `messages` (Verify fails while `draazy.com` still
+    redirects to sandbox). Every app subscribed to the WABA gets its own copy, so sandbox keeps its webhook.
 - [ ] **3.6 [OWNER] Cashfree:**
   - Activate the live account and rename the merchant from "testMerchantName".
   - Set the live webhook to the prod URL with failed and user-dropped events.
@@ -215,9 +217,10 @@ The agent prepares the lists; the owner does the clicks.
 - [ ] **3.8 [OWNER] GitHub repo settings:** Dependabot alerts, secret scanning, push protection; rotate
   `backend/.env.local` secrets.
 - [ ] **3.9 [OWNER] ZeptoMail:** prod domain verified (SPF, DKIM, DMARC), staff alert emails. Mail agent
-  `draazy-prod` exists (API key in `PROD_ZEPTOMAIL_API_KEY`). Once `draazy.com/api` answers (the 302 rule is
-  gone), add its webhook `https://draazy.com/api/webhooks/zeptomail` (bounces + feedback loop) and copy its
-  authentication key into `PROD_ZEPTOMAIL_WEBHOOK_KEY`: Verify fails while the URL redirects to sandbox.
+  `draazy-prod` exists (API key in `PROD_ZEPTOMAIL_API_KEY`; its authentication key is already set to
+  `PROD_ZEPTOMAIL_WEBHOOK_KEY`). Once `draazy.com/api` answers (the 302 rule is gone), add its webhook
+  `https://draazy.com/api/webhooks/zeptomail` (soft + hard bounces, feedback loop): Verify fails while the URL
+  redirects to sandbox. The sandbox agent is `draazy-sandbox`.
   (`ZEPTOMAIL_ENABLED=true` and an email on each staff account).
 
 ## Phase 4: Legal, content and ops (owner, agent assists)
