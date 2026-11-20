@@ -655,7 +655,7 @@ tell those apart.
 
 | Scope | Secrets | Variables |
 |---|---|---|
-| repository (backend) | `DIGITALOCEAN_ACCESS_TOKEN`, `SANDBOX_JWT_SECRET`, `SANDBOX_ORIGIN_SHARED_SECRET`, `SANDBOX_REFERRAL_SIGNAL_SALT`, `SANDBOX_IDENTITY_HASH_SECRET`, `SANDBOX_STAFF_TOTP_KEY`, `SANDBOX_IDENTITY_ENCRYPTION_KEY`, `SANDBOX_CASHFREE_APP_ID`, `SANDBOX_CASHFREE_SECRET_KEY`, `SANDBOX_ZEPTOMAIL_API_KEY`, `SANDBOX_ZEPTOMAIL_WEBHOOK_KEY`, `SANDBOX_WHATSAPP_ACCESS_TOKEN`, `SANDBOX_WHATSAPP_APP_SECRET`, `SANDBOX_WHATSAPP_WEBHOOK_VERIFY_TOKEN`, `SANDBOX_TURNSTILE_SECRET_KEY`, `SANDBOX_R2_ACCESS_KEY_ID`, `SANDBOX_R2_SECRET_ACCESS_KEY`, `SANDBOX_GOOGLE_PLACES_SERVER_KEY`, `SANDBOX_PUSH_VAPID_PRIVATE_KEY`, `SANDBOX_PUSH_VAPID_PUBLIC_KEY`, `SANDBOX_BOOTSTRAP_ADMIN_EMAIL`, `SANDBOX_BOOTSTRAP_ADMIN_MOBILE` | `SANDBOX_R2_ENDPOINT`, `SANDBOX_R2_BUCKET_PRIVATE`, `SANDBOX_R2_BUCKET_PUBLIC`, `SANDBOX_R2_PUBLIC_BASE_URL`, `SANDBOX_BOOTSTRAP_ADMIN_RECOVER` (blank = off) |
+| repository (backend) | `SANDBOX_DIGITALOCEAN_ACCESS_TOKEN`, `SANDBOX_JWT_SECRET`, `SANDBOX_ORIGIN_SHARED_SECRET`, `SANDBOX_REFERRAL_SIGNAL_SALT`, `SANDBOX_IDENTITY_HASH_SECRET`, `SANDBOX_STAFF_TOTP_KEY`, `SANDBOX_IDENTITY_ENCRYPTION_KEY`, `SANDBOX_CASHFREE_APP_ID`, `SANDBOX_CASHFREE_SECRET_KEY`, `SANDBOX_ZEPTOMAIL_API_KEY`, `SANDBOX_ZEPTOMAIL_WEBHOOK_KEY`, `SANDBOX_WHATSAPP_ACCESS_TOKEN`, `SANDBOX_WHATSAPP_APP_SECRET`, `SANDBOX_WHATSAPP_WEBHOOK_VERIFY_TOKEN`, `SANDBOX_TURNSTILE_SECRET_KEY`, `SANDBOX_R2_ACCESS_KEY_ID`, `SANDBOX_R2_SECRET_ACCESS_KEY`, `SANDBOX_GOOGLE_PLACES_SERVER_KEY`, `SANDBOX_PUSH_VAPID_PRIVATE_KEY`, `SANDBOX_PUSH_VAPID_PUBLIC_KEY`, `SANDBOX_BOOTSTRAP_ADMIN_EMAIL`, `SANDBOX_BOOTSTRAP_ADMIN_MOBILE` | `SANDBOX_R2_ENDPOINT`, `SANDBOX_R2_BUCKET_PRIVATE`, `SANDBOX_R2_BUCKET_PUBLIC`, `SANDBOX_R2_PUBLIC_BASE_URL`, `SANDBOX_BOOTSTRAP_ADMIN_RECOVER` (blank = off) |
 | repository (frontend publish) | `CLOUDFLARE_API_TOKEN` (Account → Cloudflare Pages → Edit, nothing else) | `CLOUDFLARE_ACCOUNT_ID` |
 | repository (frontend build) | `SANDBOX_VITE_GOOGLE_MAPS_API_KEY`, `SANDBOX_VITE_GA_ID` | `VITE_GOOGLE_MAPS_MAP_ID` (shared map style), `SANDBOX_VITE_CASHFREE_MODE`, `SANDBOX_VITE_PMF_MODE`, `SANDBOX_VITE_VAPID_PUBLIC_KEY`, `SANDBOX_VITE_TURNSTILE_SITE_KEY`, `SANDBOX_VITE_POSTHOG_KEY` (US-cloud project `draazy-sandbox`; blank = off), `SANDBOX_VITE_POSTHOG_APP_URL` |
 
@@ -664,7 +664,7 @@ values and `SANDBOX_BOOTSTRAP_ADMIN_RECOVER` are variables because they are iden
 that opens the bucket is a secret. Everything sensitive is a secret, never a variable, because a variable
 prints in the run log. All of them are **repository** secrets: the repository is private on GitHub Free,
 which ignores environment secrets and protection rules, so a job sees only the secrets it names.
-`DIGITALOCEAN_ACCESS_TOKEN` needs custom scopes **app: create, read, update** and nothing else.
+`SANDBOX_DIGITALOCEAN_ACCESS_TOKEN` (DO token `draazy-sandbox-deploy`) needs custom scopes **app: create, read, update** and nothing else.
 
 **There is no deployment branch policy.** A private repository on GitHub Free has no environments, so
 anyone with write access can dispatch any ref, including a branch that edits `do-app-sandbox.yaml` or
@@ -704,7 +704,7 @@ It differs from sandbox in five ways:
 
 Inputs beyond the `PROD_*` twins of the sandbox list: secret `PROD_DB_APP_PASSWORD` (the `draazy_app`
 role's password, §2.1), variables `PROD_DB_CLUSTER_NAME`, `PROD_INTERNAL_PROXIES` (§4) and
-`PROD_CASHFREE_ENABLED`. `DIGITALOCEAN_ACCESS_TOKEN` additionally needs **database: read, update,
+`PROD_CASHFREE_ENABLED`. `PROD_DIGITALOCEAN_ACCESS_TOKEN` (DO token `draazy-prod-deploy`) also needs **database: read, update,
 view_credentials** for the dump. `DeploymentManifestTest` checks both specs and that every required `${...}` in
 `application-prod.properties` reaches the prod service.
 
@@ -830,7 +830,7 @@ the listing; it must render from the public bucket URL.
 1. cloud.digitalocean.com → enable 2FA, add a billing alert, and create the project `draazy-sandbox`
    (Environment: Development).
 2. API → Tokens → **Generate new token**: name `github-deploy-sandbox`, custom scopes **app: create, read,
-   update**. Store it as `DIGITALOCEAN_ACCESS_TOKEN` below.
+   update**. Store it as `SANDBOX_DIGITALOCEAN_ACCESS_TOKEN` below.
 3. Set every repository value from §5.1. Pipe secrets in so they never reach shell
    history as arguments:
 
