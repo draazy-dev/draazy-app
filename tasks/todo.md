@@ -7,6 +7,12 @@
 
 ## Open
 
+- SEC-AUDIT-LOWS (2026-11-19, uncommitted): fixes from the pre-launch audit. Admin bootstrap invite is emailed, not logged, when ZeptoMail is on; `@Size` on `UserUpdate` email/city/avatar and the admin patch avatar; Terms/Privacy line on Signin; PostHog `reset()` on logout; `.well-known/security.txt` (contact `support@`, Expires 2027-11-19). `AdminBootstrapTest` and `UserProfileUpdateTest` green.
+- SEC-AUDIT-REST (2026-11-19, uncommitted): M1 Postgres rate-limit store (prod/sandbox), L3 staff-lockout decoy, L4 HMAC OTP hash (legacy sha256 fallback: TODO drop), L8 WebPush unresolved host is skipped and the subscription kept. Targeted backend tests green. PENDING VERIFICATION: `e2e\run-fast.ps1 -Full`. PENDING AGENT REVIEW. M3: access JWT is memory-only (`lib/auth.js`); `main.jsx` awaits one `/auth/refresh` (5 s cap) before first render when the session hint is present; legacy `draazyTokens` is adopted once and deleted (e2e seeding still works); token-reading specs now `import('/src/lib/auth.js')`. PENDING REVIEW incl. react-reviewer and security-reviewer.
+  - [ ] PENDING VERIFICATION: `run-fast.ps1` signin-otp-session (new Terms spec) plus analytics-consent. Deferred because another session's 4-shard run was in flight.
+  - [ ] PENDING VERIFICATION: the PostHog reset has no spec, because the e2e build has no PostHog key.
+  - [ ] Reviewers (code-reviewer, react-reviewer, security-reviewer for the bootstrap change) and `-Full` before commit.
+  - The 2026-11-19 `-Full` (2230/2232, the one red an HMR reload from these frontend edits landing mid-run) predates this slice's rate-limit store, so it does not count for it. `rate_limit_counters` (26.11.45) is now WAIVED in `check-seed-coverage.mjs`.
 - REFER-KYC (2026-11-08, uncommitted): referral caps 3/month and 10/year (migration 26.11.44); the referrer's 50% credit is locked until both sides have KYC. Backend and 58 referral e2e tests green. All five uncommitted slices here were reviewed on 2026-11-19 (react, code, security reviewers) and both findings are fixed (erasure now deletes invites *to* the erased number; the startup purge no longer aborts boot on failure). Only the shared `-Full` run remains before commit.
   - Below-bar review notes, not yet fixed:
     - `DataExportScope` (around line 1150): the rationale for withholding `referred_mobile` is stale now that the friends list shows it unmasked; the export should probably also cover `referral_invites` and `referral_redeem_failures`.

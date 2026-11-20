@@ -50,9 +50,9 @@ REFER-SIMPLE is committed. REFER-KYC (caps 3/10, credit locked until both have K
 
 | Fact | Value | Taken |
 |---|---|---|
-| Next free Flyway slot | `26.11.45__?` (no `V`) | 2026-11-08 |
+| Next free Flyway slot | `26.11.46__?` (no `V`; 45 is the uncommitted rate-limit table) | 2026-11-19 |
 | e2e spec files | 474 under `e2e/tests` | 2026-11-06 |
 | Targeted e2e, REFER-KYC (7 referral spec files) | 58/58 green | 2026-11-08 |
 | Targeted e2e, REFER-FRIENDS (3 referral spec files) | 28/28 green | 2026-11-08 |
-| Full e2e (`-Full`, 4 shards + nobackend) | 31 red (stale specs, flakes, a rent-ledger bug, a public-cache race); all fixed, green on rerun | 2026-11-07 |
+| Full e2e (`-Full`, 4 shards + nobackend) | 2232 tests: 2230 green, 1 skip, 1 red (HMR reload from another session's mid-run edit), green on rerun | 2026-11-19 |
 | Backend suite (full) | 4,577 tests; 139 reds (Postgres connection exhaustion + one migration guard), green on rerun | 2026-11-03 |
