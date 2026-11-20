@@ -126,7 +126,7 @@ whose one declared difference is that it adds the seed location back. A seeded d
 promoted to production: point production at its own database.
 
 Sandbox and production read the same variable *names* and entirely different *values* (separate
-databases, GitHub environment secrets and Cashfree credentials). `SandboxProfileContractTest` asserts the
+databases, GitHub secrets and Cashfree credentials). `SandboxProfileContractTest` asserts the
 two files stay identical apart from the declared divergence, so hardening prod without sandbox fails the
 build. All four tiers are in [`system/profiles.md`](./system/profiles.md).
 
@@ -238,7 +238,7 @@ creator, who shares it privately; manager-created staff invites also notify the 
 Sandbox sends real, random OTPs through WhatsApp exactly like prod: `do-app-sandbox.yaml` sets
 `WHATSAPP_ENABLED=true`, the business number's `WHATSAPP_PHONE_NUMBER_ID` and the approved
 `draazy_login_otp` / `draazy_identity_decision` templates, and the deploy workflow passes the System User
-token from the GitHub `sandbox` environment secret **`SANDBOX_WHATSAPP_ACCESS_TOKEN`** (the deploy fails
+token from the GitHub repository secret **`SANDBOX_WHATSAPP_ACCESS_TOKEN`** (the deploy fails
 fast while it is empty). Every send is billed to the Meta prepaid balance and only reaches mobiles
 registered on WhatsApp, so seeded demo mobiles cannot sign in — use your own number.
 
@@ -253,7 +253,7 @@ carry it into production. `application-prod.properties` also pins the key empty.
 
 Sandbox also enforces Turnstile on the code send and both waitlists (`TURNSTILE_ENABLED=true`). Create a
 widget in Cloudflare → Turnstile for the sandbox hostname, then add its secret key as the `sandbox`
-environment secret **`SANDBOX_TURNSTILE_SECRET_KEY`** and its site key as the repository variable
+repository secret **`SANDBOX_TURNSTILE_SECRET_KEY`** and its site key as the repository variable
 **`VITE_TURNSTILE_SITE_KEY`**. The deploy stops before anything ships while either is empty, because the
 API would refuse every sign-in from a bundle without the widget. Sign in once by hand after the first
 rollout: the health check cannot catch a mismatched key pair or a widget missing the sandbox hostname.
@@ -522,7 +522,7 @@ secret. Both halves must hold the same value:
 
 | Where | How |
 |---|---|
-| Backend | GitHub `sandbox` environment secret `SANDBOX_ORIGIN_SHARED_SECRET`, rendered into the spec as `ORIGIN_SHARED_SECRET` |
+| Backend | GitHub repository secret `SANDBOX_ORIGIN_SHARED_SECRET`, rendered into the spec as `ORIGIN_SHARED_SECRET` |
 | Pages Function | `npx wrangler pages secret put ORIGIN_SHARED_SECRET --project-name=draazy` |
 
 Generate it once (§3). The backend refuses to boot on a blank value or on one shorter than 32
@@ -629,7 +629,7 @@ the first's backend.
 | `gate` | Rejects a mistyped confirmation; decides which halves run; requires `VITE_TURNSTILE_SITE_KEY` |
 | `backend` (env `sandbox`) | Builds `backend/Dockerfile` on an amd64 runner and pushes it to GHCR tagged with the commit SHA; fails if any required secret is empty; renders the spec with `envsubst`; `doctl apps create --spec … --wait` (or `update <id>` when an app named `draazy-api-sandbox` exists); requires the latest deployment to be `ACTIVE`; smoke-tests `/api/actuator/health` on the default ingress (12 attempts); deletes the rendered spec |
 | `frontend-build` | `npm ci` and `npm run build` with the `VITE_*` inputs below; verifies `dist/index.html`, `404.html`, `_redirects`, `_headers`, `functions/api/[[path]].js` and the face model exist; uploads `dist/` and `functions/` as a one-day artifact |
-| `frontend-publish` (env `sandbox-web`) | `wrangler pages deploy dist --project-name draazy --branch main`, tagged with the same SHA; then a smoke test through `sandbox.draazy.com` (deep links, security headers, no CORS grant, `/api/actuator/health` returns JSON `UP`) |
+| `frontend-publish` | `wrangler pages deploy dist --project-name draazy --branch main`, tagged with the same SHA; then a smoke test through `sandbox.draazy.com` (deep links, security headers, no CORS grant, `/api/actuator/health` returns JSON `UP`) |
 
 The deploy **ships both halves from one commit, backend first**; the frontend runs unless the backend
 job failed or was cancelled. API changes are additive (expand/contract), so an old UI always works against
@@ -639,7 +639,7 @@ PRE_DEPLOY job runs first; if it fails, the deployment fails and the previous ve
 **The frontend is two jobs, and the split is a security boundary.** `frontend-build` runs dependency and
 project scripts and holds no deploy credential and no environment. `frontend-publish` checks out nothing,
 so `npx wrangler` cannot be redirected by an `.npmrc` or a shadowing `node_modules/wrangler` planted
-during the build, and its separate environment, `sandbox-web`, holds only the Cloudflare credentials — it
+during the build, and it is handed only the Cloudflare credentials — it
 can reach neither the DigitalOcean token nor any app secret.
 
 **Two build-time hazards live in the frontend half.** Every `VITE_*` value is inlined by Vite at build
@@ -655,24 +655,23 @@ tell those apart.
 
 | Scope | Secrets | Variables |
 |---|---|---|
-| `sandbox` environment | `DIGITALOCEAN_ACCESS_TOKEN`, `SANDBOX_JWT_SECRET`, `SANDBOX_ORIGIN_SHARED_SECRET`, `SANDBOX_REFERRAL_SIGNAL_SALT`, `SANDBOX_IDENTITY_HASH_SECRET`, `SANDBOX_STAFF_TOTP_KEY`, `SANDBOX_IDENTITY_ENCRYPTION_KEY`, `SANDBOX_CASHFREE_APP_ID`, `SANDBOX_CASHFREE_SECRET_KEY`, `SANDBOX_ZEPTOMAIL_API_KEY`, `SANDBOX_ZEPTOMAIL_WEBHOOK_KEY`, `SANDBOX_WHATSAPP_ACCESS_TOKEN`, `SANDBOX_TURNSTILE_SECRET_KEY`, `SANDBOX_R2_ACCESS_KEY_ID`, `SANDBOX_R2_SECRET_ACCESS_KEY`, `SANDBOX_GOOGLE_PLACES_SERVER_KEY`, `SANDBOX_PUSH_VAPID_PRIVATE_KEY`, `SANDBOX_PUSH_VAPID_PUBLIC_KEY`, `SANDBOX_BOOTSTRAP_ADMIN_EMAIL`, `SANDBOX_BOOTSTRAP_ADMIN_MOBILE` | `SANDBOX_R2_ENDPOINT`, `SANDBOX_R2_BUCKET_PRIVATE`, `SANDBOX_R2_BUCKET_PUBLIC`, `SANDBOX_R2_PUBLIC_BASE_URL`, `SANDBOX_BOOTSTRAP_ADMIN_RECOVER` (blank = off) |
-| `sandbox-web` environment | `CLOUDFLARE_API_TOKEN` (Account → Cloudflare Pages → Edit, nothing else) | `CLOUDFLARE_ACCOUNT_ID` |
+| repository (backend) | `DIGITALOCEAN_ACCESS_TOKEN`, `SANDBOX_JWT_SECRET`, `SANDBOX_ORIGIN_SHARED_SECRET`, `SANDBOX_REFERRAL_SIGNAL_SALT`, `SANDBOX_IDENTITY_HASH_SECRET`, `SANDBOX_STAFF_TOTP_KEY`, `SANDBOX_IDENTITY_ENCRYPTION_KEY`, `SANDBOX_CASHFREE_APP_ID`, `SANDBOX_CASHFREE_SECRET_KEY`, `SANDBOX_ZEPTOMAIL_API_KEY`, `SANDBOX_ZEPTOMAIL_WEBHOOK_KEY`, `SANDBOX_WHATSAPP_ACCESS_TOKEN`, `SANDBOX_TURNSTILE_SECRET_KEY`, `SANDBOX_R2_ACCESS_KEY_ID`, `SANDBOX_R2_SECRET_ACCESS_KEY`, `SANDBOX_GOOGLE_PLACES_SERVER_KEY`, `SANDBOX_PUSH_VAPID_PRIVATE_KEY`, `SANDBOX_PUSH_VAPID_PUBLIC_KEY`, `SANDBOX_BOOTSTRAP_ADMIN_EMAIL`, `SANDBOX_BOOTSTRAP_ADMIN_MOBILE` | `SANDBOX_R2_ENDPOINT`, `SANDBOX_R2_BUCKET_PRIVATE`, `SANDBOX_R2_BUCKET_PUBLIC`, `SANDBOX_R2_PUBLIC_BASE_URL`, `SANDBOX_BOOTSTRAP_ADMIN_RECOVER` (blank = off) |
+| repository (frontend publish) | `CLOUDFLARE_API_TOKEN` (Account → Cloudflare Pages → Edit, nothing else) | `CLOUDFLARE_ACCOUNT_ID` |
 | repository (frontend build) | `VITE_GOOGLE_MAPS_API_KEY`, `VITE_GA_ID` | `VITE_GOOGLE_MAPS_MAP_ID`, `VITE_CASHFREE_MODE`, `VITE_PMF_MODE`, `VITE_VAPID_PUBLIC_KEY`, `VITE_TURNSTILE_SITE_KEY`, `VITE_POSTHOG_KEY` (US-cloud project key; blank = off), `VITE_POSTHOG_APP_URL` |
 
 The workflow fails fast when any `sandbox` value except the three bootstrap ones is empty. The four R2
 values and `SANDBOX_BOOTSTRAP_ADMIN_RECOVER` are variables because they are identifiers; the R2 key pair
-that opens the bucket is a secret. Everything sensitive is an environment secret, never a repository
-variable, because the repository is public and a variable would print in the run log.
+that opens the bucket is a secret. Everything sensitive is a secret, never a variable, because a variable
+prints in the run log. All of them are **repository** secrets: the repository is private on GitHub Free,
+which ignores environment secrets and protection rules, so a job sees only the secrets it names.
 `DIGITALOCEAN_ACCESS_TOKEN` needs custom scopes **app: create, read, update** and nothing else.
 
-**Decide the deployment branch policy on the `sandbox` and `sandbox-web` environments.**
-`workflow_dispatch` accepts any ref, and the workflow's confirmation input checks the environment name
-rather than `github.ref` — so under "All branches", anyone with write access can deploy an unreviewed
-branch, including one that edits `do-app-sandbox.yaml` or `frontend-publish` to exfiltrate a credential.
-Restricting the policy to `main` closes that and costs the ability to deploy a feature branch, which is the
-reason the trigger is manual in the first place. Sandbox keeps "All branches" deliberately; a production
-environment must not. The environment setting is the right place for the decision, because it cannot be
-changed by the same pull request that would abuse it.
+**There is no deployment branch policy.** A private repository on GitHub Free has no environments, so
+anyone with write access can dispatch any ref, including a branch that edits `do-app-sandbox.yaml` or
+`frontend-publish` to exfiltrate a credential. Sandbox accepts any ref deliberately: deploying a feature
+branch is why the trigger is manual. The production workflow checks `github.ref` itself (only `main` or a
+`v*` tag). That check lives in the file a branch could edit, so it is weaker than an environment policy:
+keep write access to the owner's own accounts.
 
 **The deploy is manual, and that moves the boundary.** There is no push or `workflow_run` trigger, so no
 event an outsider can cause starts a job holding these credentials (`workflow_run` hands the triggered
@@ -803,33 +802,28 @@ CORS error, so it reads as a flaky uploader. `GET` only: photos are uploaded thr
 no browser ever writes to a bucket. **Checkpoint:** after §6.4, upload a listing photo and reload
 the listing; it must render from the public bucket URL.
 
-### 6.3 DigitalOcean account and GitHub environments
+### 6.3 DigitalOcean account and GitHub secrets
 
 1. cloud.digitalocean.com → enable 2FA, add a billing alert, and create the project `draazy-sandbox`
    (Environment: Development).
 2. API → Tokens → **Generate new token**: name `github-deploy-sandbox`, custom scopes **app: create, read,
    update**. Store it as `DIGITALOCEAN_ACCESS_TOKEN` below.
-3. Create the environments and set every `sandbox` value from §5.1. Pipe secrets in so they never reach shell
+3. Set every repository value from §5.1. Pipe secrets in so they never reach shell
    history as arguments:
 
    ```bash
    # macOS
-   gh api --method PUT repos/draazy-dev/draazy-app/environments/sandbox
-   gh api --method PUT repos/draazy-dev/draazy-app/environments/sandbox-web
-   printf '%s' "$VALUE" | gh secret set SANDBOX_JWT_SECRET --env sandbox -R draazy-dev/draazy-app
-   gh variable set SANDBOX_R2_BUCKET_PUBLIC --env sandbox -R draazy-dev/draazy-app --body 'draazy-sandbox-public'
+   printf '%s' "$VALUE" | gh secret set SANDBOX_JWT_SECRET -R draazy-dev/draazy-app
+   gh variable set SANDBOX_R2_BUCKET_PUBLIC -R draazy-dev/draazy-app --body 'draazy-sandbox-public'
    ```
 
    ```powershell
    # Windows
-   gh api --method PUT repos/draazy-dev/draazy-app/environments/sandbox
-   gh api --method PUT repos/draazy-dev/draazy-app/environments/sandbox-web
-   $env:VALUE | gh secret set SANDBOX_JWT_SECRET --env sandbox -R draazy-dev/draazy-app
-   gh variable set SANDBOX_R2_BUCKET_PUBLIC --env sandbox -R draazy-dev/draazy-app --body 'draazy-sandbox-public'
+   $env:VALUE | gh secret set SANDBOX_JWT_SECRET -R draazy-dev/draazy-app
+   gh variable set SANDBOX_R2_BUCKET_PUBLIC -R draazy-dev/draazy-app --body 'draazy-sandbox-public'
    ```
 
-4. `sandbox-web`: secret `CLOUDFLARE_API_TOKEN` and variable `CLOUDFLARE_ACCOUNT_ID`. Repository: the
-   `VITE_*` secrets and variables. Then decide the branch policy (§5.1).
+4. Secret `CLOUDFLARE_API_TOKEN`, variable `CLOUDFLARE_ACCOUNT_ID`, and the `VITE_*` secrets and variables.
 5. Set `SANDBOX_ORIGIN_SHARED_SECRET` once and reuse the same value for the Pages secret in §6.5.
 6. Cloudflare → Turnstile: create the sandbox widget and set `SANDBOX_TURNSTILE_SECRET_KEY` /
    `VITE_TURNSTILE_SITE_KEY` (§3.1).

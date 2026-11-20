@@ -40,7 +40,65 @@ them back to the owner. Where a task is both, the agent does its part and stops.
 | Branch | `feature/e2e-testing` is 193 commits ahead of `main`; REFER-KYC and REFER-FRIENDS uncommitted |
 | Security | Two reviews 2026-11-19: auth, JWT, OTP, staff TOTP, contact gate, webhooks, uploads, KYC crypto, DPDP export/erasure, IDOR, admin SQL, CORS all sound |
 
+### Checked from outside on 2026-11-20 (read-only)
+
+| Check | Result | Action |
+|---|---|---|
+| Dev machine | macOS now; `pwsh` not installed, so `run-fast.ps1` and `graphify.ps1` cannot run | **0.1 [OWNER]** `brew install powershell` before any Phase 1 gate |
+| `draazy.com` | 302 → `sandbox.draazy.com` (dashboard rule); NS on Cloudflare; `api.draazy.com` has no record | Expected until 3.4's last bullet |
+| Sandbox edge | HSTS, CSP, `X-Frame-Options: DENY` present; direct DO origin returns 403 | OK |
+| GitHub environments | `sandbox`, `sandbox-web` only; no `production` | 3.1 |
+| `doctl` | Token returns 403 on `/v2/account` (expired or wrong scope) | **0.2 [OWNER]** `doctl auth init` with a read+write token |
+| Mail DNS | MX and SPF are Zoho Mail; DKIM `zmail._domainkey` present; DMARC `p=quarantine` with `rua` at `onsecureserver.net` (a GoDaddy leftover) | 3.9: verify ZeptoMail's bounce CNAME, point `rua` to an inbox you read |
+| Branch | `feature/e2e-testing` is 220 commits ahead of `main` (last `main` commit 2026-10-14) | 1.4 |
+| Cloudflare dashboard (R2, WAF, rate limits, Pages) | **Not verified**: Chrome extension not connected | 3.4: owner confirms each item, or runs `scripts/sandbox-preflight.sh` with a read-only `CF_API_TOKEN` exported in the shell |
+
 ---
+
+### Owner rulings, 2026-11-20
+
+- Sizing: **1 API instance + a single-node Managed DB** (no standby). Record both as risks in
+  `DEPLOY.md` §7. This makes the 2.4 `pg_dump` to private R2 **mandatory**, not optional.
+- Workflow: a **separate `deploy-prod.yml`**; `deploy.yml` stays sandbox-only.
+- R2: the owner has created a **prod public + private bucket pair**, separate from sandbox.
+
+- Cost: **MVP, minimum spend, free tier wherever it works.** Re-check every paid line in Phase 2 and 3 against this.
+- GitHub: **stay on the Free org plan and go private.** Free ignores environment secrets and protection rules on
+  private repos, so every secret is a repository secret (`SANDBOX_*`, `PROD_*`). Branch `feature/prod-setup`
+  already drops `environment:` from `deploy.yml`, skips SonarQube Cloud while private, and moves Dependabot to monthly
+  (2,000 free Actions minutes/month; one CI run is ~10 billable minutes).
+
+## Phase 0: Go private and hand the agent CLI access
+
+Order matters: secrets first, workflow change second, flip last, or the sandbox deploy breaks in between.
+
+- [ ] **0.1 [OWNER]** `brew install powershell` (needed by `run-fast.ps1` and `graphify.ps1`).
+- [ ] **0.2 [OWNER] CLI tokens, kept out of chat.** Store each in the macOS Keychain and export it from `~/.zshrc`
+  so the agent's shell sees it:
+  `security add-generic-password -a "$USER" -s <name> -w` (it prompts for the value), then
+  `export VAR="$(security find-generic-password -s <name> -w 2>/dev/null)"`.
+  - GitHub: on the org, make `yatishpatil101` **admin** of `draazy-app` (it is `write`; secrets, visibility and
+    packages need admin), then `gh auth refresh -s read:packages,write:packages`.
+  - DigitalOcean: token `claude-cli`, 90-day expiry, custom scopes app + database + monitoring + project
+    (create/read/update, **no delete**); `doctl auth init --context draazy` and `doctl auth switch --context draazy`.
+  - Cloudflare: API token `claude-cli`, 90-day expiry, zone `draazy.com` only. Zone: DNS, Zone Settings,
+    Firewall Services, Cache Rules **Read**. Account: Cloudflare Pages **Edit**, Workers R2 Storage **Read**,
+    Turnstile **Read**. Keychain name `draazy-cf-token`; export as both `CLOUDFLARE_API_TOKEN` and `CF_API_TOKEN`.
+    Widen a scope only when a step needs it.
+- [ ] **0.3 [OWNER] Copy the deploy secrets to repository level.** Values can't be read back. Re-enter the ones you
+  have, re-copy third-party keys from their dashboards, regenerate the random ones (`openssl rand -base64 48`;
+  identity encryption key `openssl rand -base64 32`). A new sandbox identity key makes sandbox KYC test data
+  unreadable, which is fine. Run in your own terminal: `pbpaste | gh secret set NAME -R draazy-dev/draazy-app`.
+  - The 22 `sandbox` env secrets: `DIGITALOCEAN_ACCESS_TOKEN` and the 21 `SANDBOX_*`; plus `CLOUDFLARE_API_TOKEN`
+    from `sandbox-web`. **[AGENT]** copies the 6 variables (they are readable) once 0.2 is done.
+- [ ] **0.4 [AGENT]** Verify every name `deploy.yml` reads exists at repo level, then commit `feature/prod-setup`
+  (on the user's OK) and open the PR to `main`.
+- [ ] **0.5 [OWNER]** Merge the PR, then ask `rohny1` to delete the public fork `rohny1/draazy-app`. Forks of a
+  public repo **stay public** after the parent goes private, with the full history.
+- [ ] **0.6 [OWNER]** Settings → Danger Zone → Change visibility → Private.
+- [ ] **0.7 [AGENT]** Make the `draazy-api` GHCR package private (a public image ships the decompilable backend),
+  add DO `registry_credentials` (a `read:packages` token) to the app spec, run a sandbox deploy, and confirm it is green.
+- [ ] **0.8 [AGENT]** Delete the now-ignored `sandbox` and `sandbox-web` environments once 0.7 is green.
 
 ## Phase 1: Make the code releasable
 
