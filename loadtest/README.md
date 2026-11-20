@@ -1,4 +1,4 @@
-﻿# Load test
+# Load test
 
 `smoke.yml` (Artillery) is the launch sanity check from `tasks/PROD-LAUNCH.md` §5.3. It answers one question: can one
 sandbox instance with a 5-connection DB pool handle a launch spike? It ramps up over 2 minutes, holds about 50

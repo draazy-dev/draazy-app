@@ -22,6 +22,7 @@ services:
       registry: ${GHCR_OWNER}
       repository: draazy-api
       tag: ${DEPLOY_SHA}
+      registry_credentials: ${GHCR_PULL_CREDENTIALS}
     instance_size_slug: apps-s-1vcpu-1gb-fixed
     instance_count: 1
     http_port: 8080
@@ -175,6 +176,7 @@ jobs:
       registry: ${GHCR_OWNER}
       repository: draazy-api
       tag: ${DEPLOY_SHA}
+      registry_credentials: ${GHCR_PULL_CREDENTIALS}
     instance_size_slug: apps-s-1vcpu-1gb-fixed
     instance_count: 1
     run_command: java -jar /app/app.jar --migrate-only

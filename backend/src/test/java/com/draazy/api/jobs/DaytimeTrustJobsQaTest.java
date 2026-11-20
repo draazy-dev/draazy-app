@@ -165,19 +165,18 @@ class DaytimeTrustJobsQaTest extends AbstractJobQaTest {
 
         User ownerReferrer = user("15", "owner");
         UUID verified = listing(ownerReferrer, "approved");
-        jdbc.update("update properties set ownership_verified_at = now(), featured_days = 14 where id = ?", verified);
+        jdbc.update("update properties set ownership_verified_at = now() where id = ?", verified);
         UUID ownerOk = referral(ownerReferrer, offMobile(1), "held", "owner",
                 Instant.now().minus(Duration.ofHours(1)), null, verified, null);
 
         User fakeReferrer = user("17", "owner");
         UUID fake = listing(fakeReferrer, "rejected");
-        jdbc.update("update properties set ownership_verified_at = now(), featured_days = 14 where id = ?", fake);
+        jdbc.update("update properties set ownership_verified_at = now() where id = ?", fake);
         UUID ownerFake = referral(fakeReferrer, offMobile(2), "held", "owner",
                 Instant.now().minus(Duration.ofHours(1)), null, fake, null);
 
         User unverifiedReferrer = user("19", "owner");
         UUID unverified = listing(unverifiedReferrer, "approved");
-        jdbc.update("update properties set featured_days = 14 where id = ?", unverified);
         UUID ownerUnverified = referral(unverifiedReferrer, offMobile(3), "held", "owner",
                 Instant.now().minus(Duration.ofHours(1)), null, unverified, null);
 
@@ -220,8 +219,8 @@ class DaytimeTrustJobsQaTest extends AbstractJobQaTest {
         int seekerBefore = remaining(releasedSeeker);
         int friendBefore = remaining(releasedFriend);
         int suspendedFriendBefore = remaining(suspendedFriend);
-        assertThat(friendBefore).isEqualTo(FREE_CONTACTS + 5);
-        assertThat(suspendedFriendBefore).isEqualTo(FREE_CONTACTS + 5);
+        assertThat(friendBefore).isEqualTo(FREE_CONTACTS);
+        assertThat(suspendedFriendBefore).isEqualTo(FREE_CONTACTS);
 
         runGroup(Group.DAYTIME);
 
@@ -229,9 +228,9 @@ class DaytimeTrustJobsQaTest extends AbstractJobQaTest {
         assertThat(referralRow(released)).containsEntry("status", "qualified").containsEntry("handled_by", "system")
                 .containsEntry("hold_until", null).containsEntry("auto_reason", null);
         assertThat(referralRow(released).get("granted_at")).isNotNull();
-        assertThat(remaining(releasedSeeker)).isEqualTo(seekerBefore + 15);
-        assertThat(remaining(releasedFriend)).isEqualTo(friendBefore);
-        assertThat(notes(releasedSeeker, "referral.outcome")).isZero();
+        assertThat(remaining(releasedSeeker)).isEqualTo(seekerBefore);
+        assertThat(remaining(releasedFriend)).isEqualTo(friendBefore + 5);
+        assertThat(notes(releasedSeeker, "referral.outcome")).isEqualTo(1);
         assertThat(audits("referral.auto.released", released)).isEqualTo(1);
 
         assertThat(referralRow(suspended)).containsEntry("status", "rejected")
@@ -243,7 +242,7 @@ class DaytimeTrustJobsQaTest extends AbstractJobQaTest {
 
         assertThat(referralRow(ownerOk)).containsEntry("status", "qualified");
         assertThat(featuredDays(verified)).isEqualTo(14);
-        assertThat(notes(ownerReferrer, "referral.outcome")).isZero();
+        assertThat(notes(ownerReferrer, "referral.outcome")).isEqualTo(1);
 
         assertThat(referralRow(ownerFake)).containsEntry("status", "rejected")
                 .containsEntry("auto_reason", "listing_taken_down");

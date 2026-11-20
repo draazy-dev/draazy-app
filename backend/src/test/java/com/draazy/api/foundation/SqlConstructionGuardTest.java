@@ -54,7 +54,14 @@ class SqlConstructionGuardTest {
             Map.entry("identity/user/export/DataExportService.java", "DataExportScope constants plus an int limit"),
             Map.entry("moderation/enquiry/EnquiryBoardQueries.java", "entity names are literals at every call site"),
             Map.entry("moderation/property/PendingQueue.java", "ROWS formatted with literal asc/desc"),
-            Map.entry("moderation/verification/NeedsInfoReviewRepository.java", "every caller passes a text block"));
+            Map.entry("moderation/verification/NeedsInfoReviewRepository.java", "every caller passes a text block"),
+            Map.entry("services/support/StaffSupportChatService.java", "update() callers pass literals"),
+            Map.entry("services/support/SupportChatDeskLinks.java", "OWNER constant picked by a checked type"),
+            Map.entry("services/support/SupportChatInbox.java", "FULL/SCOPED constants, literal view filters, bound context"),
+            Map.entry("services/support/SupportChatLabels.java", "BY_ID constant picked by type"),
+            Map.entry("services/support/SupportChatReads.java", "SupportChatScope.about(): literal columns, bound scope values"),
+            Map.entry("services/support/SupportChatTimeline.java", "MESSAGES formatted with SupportChatScope.about()"),
+            Map.entry("services/support/SupportTicketAbouts.java", "OWNED constant picked by type"));
 
     private static final Map<String, String> REVIEWED_UNESCAPED_LIKE = Map.of(
             "catalog/locality/LocalityRepository.java", "LocalityPlaceService.search strips % _ and \\ first",

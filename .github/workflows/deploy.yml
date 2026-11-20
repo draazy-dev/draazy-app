@@ -28,7 +28,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  CF_PAGES_PROJECT: draazy
+  CF_PAGES_PROJECT: draazy-sandbox
   CF_PRODUCTION_BRANCH: main
 
   # Only the custom domain shares a registrable domain between SPA and /api.
@@ -85,10 +85,10 @@ jobs:
       # widget could not sign in. Both halves need it, so it gates either target.
       - name: Require the Turnstile site key
         env:
-          VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.SANDBOX_VITE_TURNSTILE_SITE_KEY }}
         run: |
           if [ -z "${VITE_TURNSTILE_SITE_KEY}" ]; then
-            echo "::error::VITE_TURNSTILE_SITE_KEY is empty. Sandbox enforces Turnstile, so sign-in and both waitlists would be refused. Set it as a repository variable." >&2
+            echo "::error::VITE_TURNSTILE_SITE_KEY is empty. Sandbox enforces Turnstile, so sign-in and both waitlists would be refused. Set SANDBOX_VITE_TURNSTILE_SITE_KEY as a repository variable." >&2
             exit 1
           fi
 
@@ -98,7 +98,6 @@ jobs:
     timeout-minutes: 40
     needs: gate
     if: needs.gate.outputs.backend == 'true'
-    environment: sandbox
     permissions:
       contents: read
       packages: write
@@ -136,6 +135,8 @@ jobs:
       - name: Render app spec
         env:
           GHCR_OWNER: ${{ steps.owner.outputs.lower }}
+          # username:token with read:packages; the image is private.
+          GHCR_PULL_CREDENTIALS: ${{ secrets.GHCR_PULL_CREDENTIALS }}
           BOOTSTRAP_ADMIN_EMAIL: ${{ secrets.SANDBOX_BOOTSTRAP_ADMIN_EMAIL }}
           BOOTSTRAP_ADMIN_MOBILE: ${{ secrets.SANDBOX_BOOTSTRAP_ADMIN_MOBILE }}
           BOOTSTRAP_ADMIN_RECOVER: ${{ vars.SANDBOX_BOOTSTRAP_ADMIN_RECOVER }}
@@ -164,7 +165,7 @@ jobs:
           PUSH_VAPID_PUBLIC_KEY: ${{ secrets.SANDBOX_PUSH_VAPID_PUBLIC_KEY }}
         run: |
           set -euo pipefail
-          required="GHCR_OWNER DEPLOY_SHA ORIGIN_SHARED_SECRET JWT_SECRET REFERRAL_SIGNAL_SALT IDENTITY_HASH_SECRET
+          required="GHCR_OWNER GHCR_PULL_CREDENTIALS DEPLOY_SHA ORIGIN_SHARED_SECRET JWT_SECRET REFERRAL_SIGNAL_SALT IDENTITY_HASH_SECRET
             STAFF_TOTP_KEY IDENTITY_ENCRYPTION_KEY CASHFREE_APP_ID CASHFREE_SECRET_KEY ZEPTOMAIL_API_KEY
             WHATSAPP_ACCESS_TOKEN TURNSTILE_SECRET_KEY
             R2_ENDPOINT R2_BUCKET_PRIVATE R2_BUCKET_PUBLIC R2_PUBLIC_BASE_URL R2_ACCESS_KEY_ID
@@ -251,21 +252,21 @@ jobs:
         working-directory: frontend
         env:
           VITE_DEPLOY_ENV: sandbox
-          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.SANDBOX_VITE_GOOGLE_MAPS_API_KEY }}
           VITE_GOOGLE_MAPS_MAP_ID: ${{ vars.VITE_GOOGLE_MAPS_MAP_ID }}
-          VITE_CASHFREE_MODE: ${{ vars.VITE_CASHFREE_MODE }}
-          VITE_PMF_MODE: ${{ vars.VITE_PMF_MODE }}
-          VITE_GA_ID: ${{ secrets.VITE_GA_ID }}
-          VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
-          VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
-          VITE_POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY }}
-          VITE_POSTHOG_APP_URL: ${{ vars.VITE_POSTHOG_APP_URL }}
+          VITE_CASHFREE_MODE: ${{ vars.SANDBOX_VITE_CASHFREE_MODE }}
+          VITE_PMF_MODE: ${{ vars.SANDBOX_VITE_PMF_MODE }}
+          VITE_GA_ID: ${{ secrets.SANDBOX_VITE_GA_ID }}
+          VITE_VAPID_PUBLIC_KEY: ${{ vars.SANDBOX_VITE_VAPID_PUBLIC_KEY }}
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.SANDBOX_VITE_TURNSTILE_SITE_KEY }}
+          VITE_POSTHOG_KEY: ${{ vars.SANDBOX_VITE_POSTHOG_KEY }}
+          VITE_POSTHOG_APP_URL: ${{ vars.SANDBOX_VITE_POSTHOG_APP_URL }}
         run: |
           set -euo pipefail
 
           # Missing map or analytics ids degrade; a missing Maps key breaks every map.
           if [ -z "${VITE_GOOGLE_MAPS_API_KEY}" ]; then
-            echo "::error::VITE_GOOGLE_MAPS_API_KEY is empty. The build would succeed and every map would render as a watermarked grey box. Set it as a repository secret." >&2
+            echo "::error::VITE_GOOGLE_MAPS_API_KEY is empty. The build would succeed and every map would render as a watermarked grey box. Set SANDBOX_VITE_GOOGLE_MAPS_API_KEY as a repository secret." >&2
             exit 1
           fi
 
@@ -307,7 +308,6 @@ jobs:
     if: >-
       !cancelled() &&
       needs['frontend-build'].result == 'success'
-    environment: sandbox-web
     permissions:
       contents: read
 
@@ -329,7 +329,7 @@ jobs:
           set -euo pipefail
           for required in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
             if [ -z "${!required}" ]; then
-              echo "::error::$required is empty. Set it on the 'sandbox-web' environment; the token needs Account → Cloudflare Pages → Edit and nothing else." >&2
+              echo "::error::$required is empty. Set it as a repository secret; the token needs Account → Cloudflare Pages → Edit and nothing else." >&2
               exit 1
             fi
           done

@@ -40,7 +40,65 @@ them back to the owner. Where a task is both, the agent does its part and stops.
 | Branch | `feature/e2e-testing` is 193 commits ahead of `main`; REFER-KYC and REFER-FRIENDS uncommitted |
 | Security | Two reviews 2026-11-19: auth, JWT, OTP, staff TOTP, contact gate, webhooks, uploads, KYC crypto, DPDP export/erasure, IDOR, admin SQL, CORS all sound |
 
+### Checked from outside on 2026-11-20 (read-only)
+
+| Check | Result | Action |
+|---|---|---|
+| Dev machine | macOS now; `pwsh` not installed, so `run-fast.ps1` and `graphify.ps1` cannot run | **0.1 [OWNER]** `brew install powershell` before any Phase 1 gate |
+| `draazy.com` | 302 → `sandbox.draazy.com` (dashboard rule); NS on Cloudflare; `api.draazy.com` has no record | Expected until 3.4's last bullet |
+| Sandbox edge | HSTS, CSP, `X-Frame-Options: DENY` present; direct DO origin returns 403 | OK |
+| GitHub environments | `sandbox`, `sandbox-web` only; no `production` | 3.1 |
+| `doctl` | Token returns 403 on `/v2/account` (expired or wrong scope) | **0.2 [OWNER]** `doctl auth init` with a read+write token |
+| Mail DNS | MX and SPF are Zoho Mail; DKIM `zmail._domainkey` present; DMARC `p=quarantine` with `rua` at `onsecureserver.net` (a GoDaddy leftover) | 3.9: verify ZeptoMail's bounce CNAME, point `rua` to an inbox you read |
+| Branch | `feature/e2e-testing` is 220 commits ahead of `main` (last `main` commit 2026-10-14) | 1.4 |
+| Cloudflare dashboard (R2, WAF, rate limits, Pages) | **Not verified**: Chrome extension not connected | 3.4: owner confirms each item, or runs `scripts/sandbox-preflight.sh` with a read-only `CF_API_TOKEN` exported in the shell |
+
 ---
+
+### Owner rulings, 2026-11-20
+
+- Sizing: **1 API instance + a single-node Managed DB** (no standby). Record both as risks in
+  `DEPLOY.md` §7. This makes the 2.4 `pg_dump` to private R2 **mandatory**, not optional.
+- Workflow: a **separate `deploy-prod.yml`**; `deploy.yml` stays sandbox-only.
+- R2: the owner has created a **prod public + private bucket pair**, separate from sandbox.
+
+- Cost: **MVP, minimum spend, free tier wherever it works.** Re-check every paid line in Phase 2 and 3 against this.
+- GitHub: **stay on the Free org plan and go private.** Free ignores environment secrets and protection rules on
+  private repos, so every secret is a repository secret (`SANDBOX_*`, `PROD_*`). Branch `feature/prod-setup`
+  already drops `environment:` from `deploy.yml`, skips SonarQube Cloud while private, and moves Dependabot to monthly
+  (2,000 free Actions minutes/month; one CI run is ~10 billable minutes).
+
+## Phase 0: Go private and hand the agent CLI access
+
+Order matters: secrets first, workflow change second, flip last, or the sandbox deploy breaks in between.
+
+- [ ] **0.1 [OWNER]** `brew install powershell` (needed by `run-fast.ps1` and `graphify.ps1`).
+- [ ] **0.2 [OWNER] CLI tokens, kept out of chat.** Store each in the macOS Keychain and export it from `~/.zshrc`
+  so the agent's shell sees it:
+  `security add-generic-password -a "$USER" -s <name> -w` (it prompts for the value), then
+  `export VAR="$(security find-generic-password -s <name> -w 2>/dev/null)"`.
+  - GitHub: on the org, make `yatishpatil101` **admin** of `draazy-app` (it is `write`; secrets, visibility and
+    packages need admin), then `gh auth refresh -s read:packages,write:packages`.
+  - DigitalOcean: token `claude-cli`, 90-day expiry, custom scopes app + database + monitoring + project
+    (create/read/update, **no delete**); `doctl auth init --context draazy` and `doctl auth switch --context draazy`.
+  - Cloudflare: API token `claude-cli`, 90-day expiry, zone `draazy.com` only. Zone: DNS, Zone Settings,
+    Firewall Services, Cache Rules **Read**. Account: Cloudflare Pages **Edit**, Workers R2 Storage **Read**,
+    Turnstile **Read**. Keychain name `draazy-cf-token`; export as both `CLOUDFLARE_API_TOKEN` and `CF_API_TOKEN`.
+    Widen a scope only when a step needs it.
+- [ ] **0.3 [OWNER] Copy the deploy secrets to repository level.** Values can't be read back. Re-enter the ones you
+  have, re-copy third-party keys from their dashboards, regenerate the random ones (`openssl rand -base64 48`;
+  identity encryption key `openssl rand -base64 32`). A new sandbox identity key makes sandbox KYC test data
+  unreadable, which is fine. Run in your own terminal: `pbpaste | gh secret set NAME -R draazy-dev/draazy-app`.
+  - The 22 `sandbox` env secrets: `DIGITALOCEAN_ACCESS_TOKEN` and the 21 `SANDBOX_*`; plus `CLOUDFLARE_API_TOKEN`
+    from `sandbox-web`. **[AGENT]** copies the 6 variables (they are readable) once 0.2 is done.
+- [ ] **0.4 [AGENT]** Verify every name `deploy.yml` reads exists at repo level, then commit `feature/prod-setup`
+  (on the user's OK) and open the PR to `main`.
+- [ ] **0.5 [OWNER]** Merge the PR, then ask `rohny1` to delete the public fork `rohny1/draazy-app`. Forks of a
+  public repo **stay public** after the parent goes private, with the full history.
+- [ ] **0.6 [OWNER]** Settings → Danger Zone → Change visibility → Private.
+- [ ] **0.7 [AGENT]** Make the `draazy-api` GHCR package private (a public image ships the decompilable backend),
+  add DO `registry_credentials` (a `read:packages` token) to the app spec, run a sandbox deploy, and confirm it is green.
+- [ ] **0.8 [AGENT]** Delete the now-ignored `sandbox` and `sandbox-web` environments once 0.7 is green.
 
 ## Phase 1: Make the code releasable
 
@@ -58,7 +116,7 @@ them back to the owner. Where a task is both, the agent does its part and stops.
 
 Ask the user to approve the design of 2.1 to 2.3 before writing them; this is architecture.
 
-- [ ] **2.1 [AGENT] `backend/deploy/do-app-prod.yaml`.** Copy the structure of `do-app-sandbox.yaml`
+- [x] **2.1 [AGENT] `backend/deploy/do-app-prod.yaml`.** Done; checked by `DeploymentManifestTest`. Copy the structure of `do-app-sandbox.yaml`
   (189 lines) and change it for prod:
   - `name: draazy-api-prod`, the same region as the prod database (`blr`).
   - `databases:` must point at a **Managed Database cluster** (`production: true`, `cluster_name`),
@@ -75,7 +133,8 @@ Ask the user to approve the design of 2.1 to 2.3 before writing them; this is ar
   **Done when:** a `ProdDeploymentManifestTest` (mirror `SandboxDeploymentManifestTest`) passes,
   asserting the profile is `prod`, the DB is `production: true`, no `FLYWAY_DB_PASSWORD` on the
   service, and every `${...}` in `application-prod.properties` is supplied.
-- [ ] **2.2 [AGENT] Production deploy workflow.** Either `.github/workflows/deploy-prod.yml` or a
+- [x] **2.2 [AGENT] Production deploy workflow.** Done as `deploy-prod.yml` (`DEPLOY.md` §5.2), without
+  `environment:` because GitHub Free ignores it on a private repo. Either `.github/workflows/deploy-prod.yml` or a
   parameterised `deploy.yml`. Requirements:
   - `workflow_dispatch` only; the confirm input must equal `production`.
   - `environment: production`, so the owner can add required reviewers in GitHub.
@@ -110,24 +169,28 @@ Ask the user to approve the design of 2.1 to 2.3 before writing them; this is ar
 
 The agent prepares the lists; the owner does the clicks.
 
-- [ ] **3.1 [OWNER] GitHub `production` environment** with required reviewers and these secrets.
+- [ ] **3.1 [OWNER] GitHub repository secrets and variables** (`PROD_*`; pushed with
+  `scripts/push-repo-secrets.py PROD`).
   **Generate every value fresh; never reuse a sandbox value.** For random secrets use
   `openssl rand -base64 48` (identity encryption key: exactly 32 bytes, base64).
   - `PROD_JWT_SECRET`, `PROD_REFERRAL_SIGNAL_SALT`, `PROD_IDENTITY_HASH_SECRET`,
-    `PROD_IDENTITY_ENCRYPTION_KEY`, `PROD_IDENTITY_ENCRYPTION_KEY_ID`, `PROD_STAFF_TOTP_KEY`
+    `PROD_IDENTITY_ENCRYPTION_KEY`, `PROD_STAFF_TOTP_KEY` (the key id `p1` is in the spec)
+  - `PROD_DB_APP_PASSWORD` (the `draazy_app` role); variables `PROD_DB_CLUSTER_NAME`, `PROD_CASHFREE_ENABLED`
   - `PROD_ORIGIN_SHARED_SECRET` (>= 32 chars; the same value goes into the prod Pages `ORIGIN_SHARED_SECRET`)
   - `PROD_CASHFREE_APP_ID`, `PROD_CASHFREE_SECRET_KEY` (**live** keys); `CASHFREE_WEBHOOK_SECRET`
     gets the same value as the secret key
-  - `PROD_WHATSAPP_PHONE_NUMBER_ID`, `PROD_WHATSAPP_ACCESS_TOKEN` (**System User** token; the
-    dashboard token expires in 24 h), `PROD_WHATSAPP_WEBHOOK_VERIFY_TOKEN`, `PROD_WHATSAPP_APP_SECRET`
+  - `PROD_WHATSAPP_ACCESS_TOKEN` (**System User** token for Meta app `draazy-prod`),
+    `PROD_WHATSAPP_APP_SECRET`, `PROD_WHATSAPP_WEBHOOK_VERIFY_TOKEN`. Both apps share one WABA, so the
+    phone number ID and template names are copied from the sandbox spec
   - `PROD_ZEPTOMAIL_*`, including the webhook key
   - `PROD_BOOTSTRAP_ADMIN_EMAIL`, `PROD_BOOTSTRAP_ADMIN_MOBILE`
   - `PROD_GOOGLE_PLACES_SERVER_KEY`, R2 credentials
   - `WEB_ORIGINS` = `https://draazy.com` **only** (security pass 2: do not include sandbox)
-  - `API_PUBLIC_ORIGIN`, `INTERNAL_PROXIES` = the DO load balancer's real CIDR (`DEPLOY.md` §4;
-    **not** `none`, or every visitor shares one rate-limit bucket)
-  - Vars: `VITE_TURNSTILE_SITE_KEY` (prod), `VITE_GOOGLE_MAPS_API_KEY` (prod),
-    `VITE_GOOGLE_MAPS_MAP_ID`, `VITE_POSTHOG_KEY`, `VITE_POSTHOG_APP_URL`, `TURNSTILE_ENABLED=true`
+  - Variable `PROD_INTERNAL_PROXIES` (`DEPLOY.md` §4; **not** `none`, or every visitor shares one rate-limit bucket)
+  - Frontend build: secrets `PROD_VITE_GOOGLE_MAPS_API_KEY` (referrer `draazy.com/*`), `PROD_VITE_GA_ID`;
+    variables `PROD_VITE_TURNSTILE_SITE_KEY`, `PROD_VITE_VAPID_PUBLIC_KEY`, `PROD_VITE_CASHFREE_MODE=production`,
+    `PROD_VITE_PMF_MODE`, `PROD_VITE_POSTHOG_KEY` and `PROD_VITE_POSTHOG_APP_URL` (PostHog project `draazy-prod`);
+    shared `VITE_GOOGLE_MAPS_MAP_ID`. Backend `TURNSTILE_ENABLED=true`
 - [ ] **3.2 [OWNER] DigitalOcean:** a Managed PostgreSQL 17 cluster in `blr` with a standby node,
   daily backups and PITR, trusted sources = the prod app only, a schema-owner user plus the runtime
   role (`app-runtime-role.sql`). Create the prod app from `do-app-prod.yaml`. Add the alert policies and
@@ -135,7 +198,8 @@ The agent prepares the lists; the owner does the clicks.
 - [ ] **3.3 [OWNER] DigitalOcean sandbox cleanup:** re-tick Trusted Sources on the sandbox DB (it was
   opened to all IPs on 2026-11-03).
 - [ ] **3.4 [OWNER] Cloudflare:**
-  - Prod Pages project on `draazy.com` with `ORIGIN_SHARED_SECRET`.
+  - Pages projects `draazy-prod` (on `draazy.com`) and `draazy-sandbox` (on `sandbox.draazy.com`, replacing
+    `draazy`), each with its own `API_ORIGIN` and `ORIGIN_SHARED_SECRET`.
   - WAF managed rules and an `/api/auth/*` rate-limit rule (Bot Fight Mode off).
   - Cache Rule for extensionless photo originals.
   - A prod R2 bucket with the `Access-Control-Allow-Origin` header (`DEPLOY.md` §3.2).
@@ -143,7 +207,9 @@ The agent prepares the lists; the owner does the clicks.
 - [ ] **3.5 [OWNER] Meta / WhatsApp:**
   - Add a **spend cap** on the billing account **before** enabling WhatsApp on prod (`DEPLOY.md` §7).
   - Make sure the OTP, agreement-invite and referral-invite templates are Active.
-  - Set the prod webhook callback `https://draazy.com/api/webhooks/whatsapp` and subscribe `messages`.
+  - In app `draazy-prod`, set the callback `https://draazy.com/api/webhooks/whatsapp` with
+    `PROD_WHATSAPP_WEBHOOK_VERIFY_TOKEN` and subscribe `messages` (Verify fails while `draazy.com` still
+    redirects to sandbox). Every app subscribed to the WABA gets its own copy, so sandbox keeps its webhook.
 - [ ] **3.6 [OWNER] Cashfree:**
   - Activate the live account and rename the merchant from "testMerchantName".
   - Set the live webhook to the prod URL with failed and user-dropped events.
@@ -153,7 +219,11 @@ The agent prepares the lists; the owner does the clicks.
   - Set quotas and budget alerts. Rotate the key whose old copy is in git history (`frontend/dist-perf`).
 - [ ] **3.8 [OWNER] GitHub repo settings:** Dependabot alerts, secret scanning, push protection; rotate
   `backend/.env.local` secrets.
-- [ ] **3.9 [OWNER] ZeptoMail:** prod domain verified (SPF, DKIM, DMARC), webhook key, staff alert emails
+- [ ] **3.9 [OWNER] ZeptoMail:** prod domain verified (SPF, DKIM, DMARC), staff alert emails. Mail agent
+  `draazy-prod` exists (API key in `PROD_ZEPTOMAIL_API_KEY`; its authentication key is already set to
+  `PROD_ZEPTOMAIL_WEBHOOK_KEY`). Once `draazy.com/api` answers (the 302 rule is gone), add its webhook
+  `https://draazy.com/api/webhooks/zeptomail` (soft + hard bounces, feedback loop): Verify fails while the URL
+  redirects to sandbox. The sandbox agent is `draazy-sandbox`.
   (`ZEPTOMAIL_ENABLED=true` and an email on each staff account).
 
 ## Phase 4: Legal, content and ops (owner, agent assists)

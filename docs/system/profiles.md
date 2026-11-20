@@ -6,8 +6,8 @@ Four tiers, in the order a change travels from a keyboard to a stranger's phone.
 |---|---|---|---|---|
 | 1 | `local` | a developer's machine | `draazy`, schema + demo seed | `.env.local`, git-ignored |
 | 2 | `local,e2e` | the Playwright suite | `draazy_e2e`, schema + seed, wiped freely | none needed |
-| 3 | `sandbox` | the shared test environment | DigitalOcean dev database, schema + demo seed | GitHub `sandbox` environment secrets |
-| 4 | `prod` | real users | DigitalOcean Managed PostgreSQL, schema only | GitHub environment secrets |
+| 3 | `sandbox` | the shared test environment | DigitalOcean dev database, schema + demo seed | GitHub `SANDBOX_*` repository secrets |
+| 4 | `prod` | real users | DigitalOcean Managed PostgreSQL, schema only | GitHub `PROD_*` repository secrets |
 
 Each tier has a file: `application-local.properties`, `application-e2e.properties`,
 `application-sandbox.properties`, `application-prod.properties`. All four layer on
@@ -15,7 +15,7 @@ Each tier has a file: `application-local.properties`, `application-e2e.propertie
 
 Every deployed tier names **exactly one** profile, and its file is self-contained: its own
 datasource, secret lookups, cookie flags, throttles and proxy CIDR. Sandbox and production read the
-same variable *names* and completely different *values* — separate databases, environment secrets
+same variable *names* and completely different *values* — separate databases, separately prefixed secrets
 and Cashfree credentials.
 
 ## The rule that makes the rest make sense
@@ -201,7 +201,7 @@ SPRING_PROFILES_ACTIVE=sandbox
 
 The shared test environment on DigitalOcean App Platform, at `sandbox.draazy.com`. Production
 configuration — env-only secrets, `Secure` cookies, real TLS, real rate limits — with demo inventory.
-It uses its own DigitalOcean database through its own `SANDBOX_*` GitHub environment secrets, and its
+It uses its own DigitalOcean database through its own `SANDBOX_*` GitHub repository secrets, and its
 own Cashfree account; no value is shared with production.
 
 Because it no longer names `prod`, it is named explicitly in `LocalProfileGuard.DEPLOYMENT_PROFILES`.

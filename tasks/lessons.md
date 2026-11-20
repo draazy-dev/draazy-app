@@ -263,3 +263,4 @@
 - **Dialogue**: connected sentences (cause → effect), never clipped word-lines. Ishaan is amused/wry, never sad or over-laughing; keep pain mild.
 - **Flow policy**: no real brands, places or signage, and no money-scam steps (blocked with no reason). Reel 3: unsigned Hinjewadi-style entrance, fake owner without money. Reel 4: Sana's clip-2 story without money.
 - **Flow voice**: spell Hindi "band" as "bandhh"; write Hindi numbers that look English in Devanagari ('दस', 'दो').
+- Never print a secret's parts when checking its format: a missing separator makes partition() print the whole value; print only length/prefix counts.
