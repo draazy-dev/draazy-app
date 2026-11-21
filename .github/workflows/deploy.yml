@@ -113,7 +113,7 @@ jobs:
           OWNER: ${{ github.repository_owner }}
         run: echo "lower=${OWNER,,}" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -173,6 +173,8 @@ jobs:
           for name in $required; do
             [ -n "${!name}" ] || { echo "::error::$name is empty." >&2; exit 1; }
           done
+          [[ "$GHCR_PULL_CREDENTIALS" =~ ^[^:[:space:]]+:[^[:space:]]+$ ]] \
+            || { echo "::error::GHCR_PULL_CREDENTIALS must be one line of username:token." >&2; exit 1; }
           vars=$(printf '${%s} ' $required BOOTSTRAP_ADMIN_EMAIL BOOTSTRAP_ADMIN_MOBILE BOOTSTRAP_ADMIN_RECOVER \
             WHATSAPP_APP_SECRET WHATSAPP_WEBHOOK_VERIFY_TOKEN ZEPTOMAIL_WEBHOOK_KEY)
           envsubst "$vars" < backend/deploy/do-app-sandbox.yaml > "$RUNNER_TEMP/app.yaml"
@@ -185,12 +187,17 @@ jobs:
         name: Create or update the app
         run: |
           set -euo pipefail
+          # stdout is redirected, so a failure that doctl reports there never reaches the log unless printed.
+          submit() {
+            doctl apps "$@" --spec "$RUNNER_TEMP/app.yaml" --wait --output json > "$RUNNER_TEMP/app.json" \
+              || { echo "::error::doctl apps $1 failed:" >&2; cat "$RUNNER_TEMP/app.json" >&2; return 1; }
+          }
           id=$(doctl apps list --output json | jq -r '.[] | select(.spec.name=="draazy-api-sandbox") | .id')
           if [ -z "$id" ]; then
-            doctl apps create --spec "$RUNNER_TEMP/app.yaml" --wait --output json > "$RUNNER_TEMP/app.json"
+            submit create
             id=$(jq -r '.[0].id' "$RUNNER_TEMP/app.json")
           else
-            doctl apps update "$id" --spec "$RUNNER_TEMP/app.yaml" --wait --output json > "$RUNNER_TEMP/app.json"
+            submit update "$id"
           fi
           phase=$(doctl apps list-deployments "$id" --output json | jq -r '.[0].phase')
           [ "$phase" = "ACTIVE" ] || { echo "::error::Latest deployment is $phase, not ACTIVE." >&2; exit 1; }
