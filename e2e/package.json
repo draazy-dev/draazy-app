@@ -14,5 +14,5 @@
     "check:console": "node scripts/check-console-filter.mjs",
     "report": "playwright show-report"
   },
-  "devDependencies": { "@playwright/test": "^1.61.1" }
+  "devDependencies": { "@playwright/test": "^1.65.1" }
 }
