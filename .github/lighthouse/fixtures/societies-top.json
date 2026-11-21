@@ -1,0 +1,49 @@
+[
+ {
+  "slug": "aster-greens-lunkad-balewadi",
+  "name": "Aster Greens",
+  "localitySlug": "balewadi",
+  "listingCount": 2
+ },
+ {
+  "slug": "golden-springs-panchshil-baner",
+  "name": "Golden Springs",
+  "localitySlug": "baner",
+  "listingCount": 2
+ },
+ {
+  "slug": "palm-court-panchshil-undri",
+  "name": "Palm Court",
+  "localitySlug": "undri",
+  "listingCount": 2
+ },
+ {
+  "slug": "aster-greens-pethkar-kharadi",
+  "name": "Aster Greens",
+  "localitySlug": "kharadi",
+  "listingCount": 1
+ },
+ {
+  "slug": "aster-heights-rachana-bavdhan",
+  "name": "Aster Heights",
+  "localitySlug": "bavdhan",
+  "listingCount": 1
+ },
+ {
+  "slug": "aster-residency-paranjape-hinjawadi",
+  "name": "Aster Residency",
+  "localitySlug": "hinjawadi",
+  "listingCount": 1
+ },
+ {
+  "slug": "bijli-nagar-hinjawadi",
+  "name": "Bijli Nagar",
+  "listingCount": 1
+ },
+ {
+  "slug": "blue-enclave-kumar-balewadi",
+  "name": "Blue Enclave",
+  "localitySlug": "balewadi",
+  "listingCount": 1
+ }
+]
