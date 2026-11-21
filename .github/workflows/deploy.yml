@@ -180,8 +180,11 @@ jobs:
           envsubst "$vars" < backend/deploy/do-app-sandbox.yaml > "$RUNNER_TEMP/app.yaml"
 
       - uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f # v2.5.2
+        # "latest" is resolved by an unauthenticated GitHub API call; when that is rate-limited the action
+        # silently installs doctl 1.98.1, which rejects the spec's registry_credentials.
         with:
           token: ${{ secrets.SANDBOX_DIGITALOCEAN_ACCESS_TOKEN }}
+          version: 2.7.0
 
       - id: deploy
         name: Create or update the app
