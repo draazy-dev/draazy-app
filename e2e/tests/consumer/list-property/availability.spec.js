@@ -190,7 +190,7 @@ test('an exact date round-trips from the edit page to the card and the detail pa
 
   await test.step('the card reads "Available from <day month>"', async () => {
     await page.goto(`/listings?deal=rent&q=${token}`);
-    const card = page.locator(`a[href*="${id}"]`).filter({ has: page.locator('h3') }).first();
+    const card = page.locator(`a[href*="${id}"]`).filter({ has: page.locator('h2') }).first();
     await expect(card).toBeVisible({ timeout: 20_000 });
     await expect(card.getByText(`Available from ${shortLabel(far)}`)).toBeVisible();
   });
@@ -204,7 +204,7 @@ test('an exact date round-trips from the edit page to the card and the detail pa
     const patch = await request.patch(`${API}/me/listings/${id}`, { headers, data: { availableOn: istToday() } });
     expect(patch.status(), await patch.text()).toBe(200);
     await page.goto(`/listings?deal=rent&q=${token}`);
-    await expect(page.locator(`a[href*="${id}"]`).filter({ has: page.locator('h3') }).first().getByText('Available now')).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator(`a[href*="${id}"]`).filter({ has: page.locator('h2') }).first().getByText('Available now')).toBeVisible({ timeout: 20_000 });
   });
 });
 

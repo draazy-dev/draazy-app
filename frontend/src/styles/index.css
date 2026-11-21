@@ -2375,7 +2375,7 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   position: fixed;
   left: 0;
   right: 0;
-  bottom: var(--dz-bottom-inset);
+  bottom: calc(var(--dz-bottom-inset) + var(--dz-cookie-banner-h));
   z-index: 60;
   display: flex;
   gap: 0.6rem;

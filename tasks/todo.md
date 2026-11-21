@@ -7,6 +7,8 @@
 
 ## Open
 
+- LIGHTHOUSE-GATES (2026-11-21, branch `fix/lighthouse-gates`): PR Lighthouse job serves a canned API (`.github/lighthouse/mock-api.mjs`, anonymised sandbox fixtures) and gates A11y/BP/SEO at 100 via `LH_ENFORCE`; `deploy-prod.yml` gets a record-only post-deploy run. A11y fixes: cookie "Accept all" teal-700, underlined privacy link, `.dz-sticky-cta` lifted by `--dz-cookie-banner-h`, footer h4→h2, Assured h3→h2, listing card title is the h2 and price a `<p>` (`availability.spec.js` selector follows). Local Lighthouse 100/100/100 on all three routes.
+  - [ ] PENDING VERIFICATION: `e2e\run-fast.ps1` on Windows for availability, property-density, tap-targets, analytics-consent, legal-pages (not runnable on the Mac).
 - SONAR-2026-11-20 (branch `fix/sonar-2026-11-20`, uncommitted): the 472-issue export fixed or accepted; frontend Vitest unit coverage wired to Sonar (96.8% lines, JSX excluded); LogScrubber now returns `[unscrubbable]` on a regex StackOverflowError. Backend full suite and 3261 unit tests green. `-Full` reds are all pre-existing or load flakes (same specs fail on a clean `main` copy).
   - Owner: mark in SonarCloud as Accepted / False positive: java:S9352 ×38, the 32 `REVIEWED_DYNAMIC_SQL` S2077 fragments, Pager/Table S3403, http.js S4822, AdminSettings S6853, errorScrub/questions.js/ServedAreaCard regex, index.html CSP ×2, CorrelationIdFilter S9436, LogScrubber S1181, MigrationSeedGuardTest, plus the brief's accept list.
   - Pre-existing on `main`: `npm run check:listing` (`deal` key mismatch between `ListingEditRules.apply`, `ListingFoundationTest`, `editPolicy`); e2e `signin-otp-session:30` (Terms link strict-mode clash with the footer), `:163`, `property-integration-account:310`, `managed-properties:84`.
