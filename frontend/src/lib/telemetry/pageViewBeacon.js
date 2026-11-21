@@ -70,7 +70,7 @@ const flush = () => {
   queue = [];
 
   const at = Date.now();
-  recordPageViews({
+  void recordPageViews({
     sessionId: sessionId(),
     events: batch.map((e) => ({
       path: e.path,

@@ -120,7 +120,7 @@ class FlatmateOwnerHomeTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON).content(roomBody(host, ownerMobile, homeType)))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         commit();
-        return json.replaceAll("(?s).*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        return json.replaceAll("(?s)^.*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
     private String postRoom(User host, String ownerMobile) throws Exception {
@@ -189,7 +189,7 @@ class FlatmateOwnerHomeTest extends AbstractApiTest {
         String json = mvc.perform(get(Routes.Flatmates.OWNER_HOMES).header(HttpHeaders.AUTHORIZATION,
                         bearerForOwner(mobile)))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-        return json.replaceAll("(?s).*?\"managedId\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        return json.replaceAll("(?s)^.*?\"managedId\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
     @Test

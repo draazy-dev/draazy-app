@@ -191,6 +191,14 @@ public class AdminSlaService {
                and (f.mod_status = 'pending' or f.recheck_requested_at is not null)
             """.formatted(FLATMATE_DECIDED, FLATMATE_POSTS);
 
+    private static final String PICKUP_TRACK = TRACK.formatted(PICKUP_COMPLETED, PICKUP_OUTSTANDING);
+
+    private static final String DELIVERY_TRACK = TRACK.formatted(DELIVERY_COMPLETED, DELIVERY_OUTSTANDING);
+
+    private static final String CONCIERGE_TRACK = TRACK.formatted(CONCIERGE_COMPLETED, CONCIERGE_OUTSTANDING);
+
+    private static final String FLATMATE_TRACK = TRACK.formatted(FLATMATE_COMPLETED, FLATMATE_OUTSTANDING);
+
     private final EntityManager em;
 
     public AdminSlaService(EntityManager em) {
@@ -227,14 +235,14 @@ public class AdminSlaService {
 
         return new SlaSummary(TARGET_HOURS, reviewed, avg, median, breached, slaRate,
                 num(row[4]), num(row[5]), withWorstPending ? worstPending() : List.of(),
-                track(PICKUP_COMPLETED, PICKUP_OUTSTANDING, PICKUP_TARGET_HOURS, since),
-                track(DELIVERY_COMPLETED, DELIVERY_OUTSTANDING, DELIVERY_TARGET_HOURS, since),
-                track(CONCIERGE_COMPLETED, CONCIERGE_OUTSTANDING, CONCIERGE_TARGET_HOURS, since),
-                track(FLATMATE_COMPLETED, FLATMATE_OUTSTANDING, FLATMATE_TARGET_HOURS, since));
+                track(PICKUP_TRACK, PICKUP_TARGET_HOURS, since),
+                track(DELIVERY_TRACK, DELIVERY_TARGET_HOURS, since),
+                track(CONCIERGE_TRACK, CONCIERGE_TARGET_HOURS, since),
+                track(FLATMATE_TRACK, FLATMATE_TARGET_HOURS, since));
     }
 
-    private SlaSummary.Track track(String completed, String outstanding, int targetHours, Instant since) {
-        Object[] row = (Object[]) em.createNativeQuery(TRACK.formatted(completed, outstanding))
+    private SlaSummary.Track track(String sql, int targetHours, Instant since) {
+        Object[] row = (Object[]) em.createNativeQuery(sql)
                 .setParameter("since", since)
                 .setParameter("target", (double) targetHours)
                 .getSingleResult();

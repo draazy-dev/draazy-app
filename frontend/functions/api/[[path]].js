@@ -31,8 +31,14 @@ const UNTRUSTED_RESPONSE_HEADERS = [
     'access-control-expose-headers',
 ];
 
+const stripTrailingSlashes = (s) => {
+    let end = s.length;
+    while (end > 0 && s[end - 1] === '/') end--;
+    return s.slice(0, end);
+};
+
 export async function onRequest({ request, env, waitUntil }) {
-    const origin = (env.API_ORIGIN || '').trim().replace(/\/+$/, '');
+    const origin = stripTrailingSlashes((env.API_ORIGIN || '').trim());
 
     if (!ORIGIN_PATTERN.test(origin)) {
         return Response.json(

@@ -5,6 +5,7 @@ import Select from '../../../components/ui/Select.jsx';
 import LocalitySelect from '../../../components/ui/LocalitySelect.jsx';
 import SocietySelect from '../../consumer/list-property/SocietySelect.jsx';
 import { activeLocality, societyLocalityName } from '../../consumer/list-property/useListingLocation.js';
+import { groupPairs } from '../../consumer/list-property/format.js';
 import FieldError from '../../../components/ui/FieldError.jsx';
 import IdInput from '../../../components/IdInput.jsx';
 import AvailabilityField from '../../../components/ui/AvailabilityField.jsx';
@@ -26,7 +27,7 @@ const formatIndian = (v) => {
   if (!s) return '';
   const last3 = s.slice(-3);
   const rest = s.slice(0, -3);
-  return (rest ? rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' : '') + last3;
+  return (rest ? groupPairs(rest) + ',' : '') + last3;
 };
 
 const moneyWords = (v) => {
@@ -85,23 +86,23 @@ export function PropertyStep({ form, set, errors }) {
   const home = !!t && !land && !commercial;
   return (
     <div className="space-y-5">
-      <div><label className={label}>Property Type *</label><ChoiceBoxes value={form.propertyType} onChange={(v) => set('propertyType', v)} options={typeOptions} ariaLabel="Property type" invalid={!!errors.propertyType} /><FieldError show={!!errors.propertyType}>Select a property type.</FieldError></div>
-      {commercial && <div><label className={label}>Commercial Type *</label><ChoiceBoxes value={form.commercialType} onChange={(v) => set('commercialType', v)} options={commercialSubtypeOptions(form.commercialType)} ariaLabel="Commercial type" invalid={!!errors.commercialType} /><FieldError show={!!errors.commercialType}>Select the commercial type.</FieldError></div>}
-      {!NONRES_TYPES.includes(t) && <div><label className={label}>BHK *</label><ChoiceBoxes value={form.bhk} onChange={(v) => set('bhk', v)} options={bhkOptions} ariaLabel="BHK" invalid={!!errors.bhk} cols="grid-cols-3 sm:grid-cols-5" /><FieldError show={!!errors.bhk}>Select the BHK configuration.</FieldError></div>}
+      <div><span className={label}>Property Type *</span><ChoiceBoxes value={form.propertyType} onChange={(v) => set('propertyType', v)} options={typeOptions} ariaLabel="Property type" invalid={!!errors.propertyType} /><FieldError show={!!errors.propertyType}>Select a property type.</FieldError></div>
+      {commercial && <div><span className={label}>Commercial Type *</span><ChoiceBoxes value={form.commercialType} onChange={(v) => set('commercialType', v)} options={commercialSubtypeOptions(form.commercialType)} ariaLabel="Commercial type" invalid={!!errors.commercialType} /><FieldError show={!!errors.commercialType}>Select the commercial type.</FieldError></div>}
+      {!NONRES_TYPES.includes(t) && <div><span className={label}>BHK *</span><ChoiceBoxes value={form.bhk} onChange={(v) => set('bhk', v)} options={bhkOptions} ariaLabel="BHK" invalid={!!errors.bhk} cols="grid-cols-3 sm:grid-cols-5" /><FieldError show={!!errors.bhk}>Select the BHK configuration.</FieldError></div>}
       <div><label htmlFor="pob-carpetArea" className={label}>{land ? 'Plot Area (sq.ft) *' : 'Carpet Area (sq.ft) *'}</label><input id="pob-carpetArea" inputMode="numeric" value={form.carpetArea} onChange={(e) => set('carpetArea', e.target.value.replace(/\D/g, ''))} placeholder="e.g. 850" className={classNames(fld, errors.carpetArea && errCls)} /><FieldError show={!!errors.carpetArea}>{land ? 'Plot area is required.' : 'Carpet area is required.'}</FieldError></div>
 
       {!land && (
-        <div className="grid grid-cols-2 gap-3"><div><label className={label}>Floor</label><Select value={form.floor} onChange={(v) => set('floor', v)} options={floorOptions} placeholder="Floor" ariaLabel="Floor" invalid={!!errors.floor} /><FieldError show={!!errors.floor}>Floor is above the total floors.</FieldError></div><div><label className={label}>Total Floors</label><Select value={form.totalFloors} onChange={(v) => set('totalFloors', v)} options={totalFloorsOptions} placeholder="Total" ariaLabel="Total floors" /></div></div>
+        <div className="grid grid-cols-2 gap-3"><div><span className={label}>Floor</span><Select value={form.floor} onChange={(v) => set('floor', v)} options={floorOptions} placeholder="Floor" ariaLabel="Floor" invalid={!!errors.floor} /><FieldError show={!!errors.floor}>Floor is above the total floors.</FieldError></div><div><span className={label}>Total Floors</span><Select value={form.totalFloors} onChange={(v) => set('totalFloors', v)} options={totalFloorsOptions} placeholder="Total" ariaLabel="Total floors" /></div></div>
       )}
-      {home && <div><label className={label}>Furnishing</label><ChoiceBoxes value={form.furnishing} onChange={(v) => set('furnishing', v)} options={furnishingOptions} ariaLabel="Furnishing" cols="grid-cols-3" /></div>}
-      {commercial && <div><label className={label}>Shell Type *</label><ChoiceBoxes value={form.shellType} onChange={(v) => set('shellType', v)} options={shellTypeOptions} ariaLabel="Shell type" invalid={!!errors.shellType} cols="grid-cols-3" /><FieldError show={!!errors.shellType}>Select the shell type.</FieldError></div>}
+      {home && <div><span className={label}>Furnishing</span><ChoiceBoxes value={form.furnishing} onChange={(v) => set('furnishing', v)} options={furnishingOptions} ariaLabel="Furnishing" cols="grid-cols-3" /></div>}
+      {commercial && <div><span className={label}>Shell Type *</span><ChoiceBoxes value={form.shellType} onChange={(v) => set('shellType', v)} options={shellTypeOptions} ariaLabel="Shell type" invalid={!!errors.shellType} cols="grid-cols-3" /><FieldError show={!!errors.shellType}>Select the shell type.</FieldError></div>}
 
       {land && (
         <>
-          <div><label className={label}>NA Status *</label><ChoiceBoxes value={form.naStatus} onChange={(v) => set('naStatus', v)} options={naStatusOptions} ariaLabel="NA status" invalid={!!errors.naStatus} cols={WIDE} /><FieldError show={!!errors.naStatus}>Select the NA status.</FieldError></div>
-          <div><label className={label}>Other Rights (7/12) *</label><ChoiceBoxes value={form.otherRights} onChange={(v) => set('otherRights', v)} options={otherRightsOptions} ariaLabel="Other rights" invalid={!!errors.otherRights} cols={WIDE} /><FieldError show={!!errors.otherRights}>Select what the Other Rights column carries.</FieldError></div>
+          <div><span className={label}>NA Status *</span><ChoiceBoxes value={form.naStatus} onChange={(v) => set('naStatus', v)} options={naStatusOptions} ariaLabel="NA status" invalid={!!errors.naStatus} cols={WIDE} /><FieldError show={!!errors.naStatus}>Select the NA status.</FieldError></div>
+          <div><span className={label}>Other Rights (7/12) *</span><ChoiceBoxes value={form.otherRights} onChange={(v) => set('otherRights', v)} options={otherRightsOptions} ariaLabel="Other rights" invalid={!!errors.otherRights} cols={WIDE} /><FieldError show={!!errors.otherRights}>Select what the Other Rights column carries.</FieldError></div>
           {form.propertyType === 'farmland' && form.deal === 'buy' && (
-            <div><label className={label}>Buyer Eligibility *</label><ChoiceBoxes value={form.buyerEligibility} onChange={(v) => set('buyerEligibility', v)} options={buyerEligibilityOptions} ariaLabel="Buyer eligibility" invalid={!!errors.buyerEligibility} cols={WIDE} /><FieldError show={!!errors.buyerEligibility}>Select who can lawfully buy this land.</FieldError></div>
+            <div><span className={label}>Buyer Eligibility *</span><ChoiceBoxes value={form.buyerEligibility} onChange={(v) => set('buyerEligibility', v)} options={buyerEligibilityOptions} ariaLabel="Buyer eligibility" invalid={!!errors.buyerEligibility} cols={WIDE} /><FieldError show={!!errors.buyerEligibility}>Select who can lawfully buy this land.</FieldError></div>
           )}
         </>
       )}
@@ -123,7 +124,7 @@ export function LocationStep({ form, set, errors, onLocalityBusy }) {
     if (!s?.id) return;
     onLocalityBusy(true);
     try {
-      const { name, slug } = await societyLocalityName(s, Number(s.lat ?? NaN), Number(s.lng ?? NaN));
+      const { name, slug } = await societyLocalityName(s, Number(s.lat ?? Number.NaN), Number(s.lng ?? Number.NaN));
       const hit = await activeLocality(name, slug);
       if (hit && seq === pickSeq.current && handPickedAt.current !== seq) { set('locality', hit.name); set('localitySlug', hit.slug); }
     } finally {
@@ -134,7 +135,7 @@ export function LocationStep({ form, set, errors, onLocalityBusy }) {
     <div className="space-y-5">
       <div><label htmlFor="pob-society" className={label}>Society / Building Name</label>
         <SocietySelect id="pob-society" value={form.societyId} name={form.society} allowNotOnMaps={false} localityLabel={form.locality} lat={form.lat} lng={form.lng} placeholder="Search society or building on Google Maps" inputClassName={fld} onChange={onSocietyChange} /></div>
-      <div><label className={label}>Locality *</label><LocalitySelect value={form.locality} onChange={(v) => pickLocality(v, '')} onSelect={(sel) => pickLocality(sel.name, sel.slug || '')} onBusyChange={onLocalityBusy} placeholder="Select locality" ariaLabel="Locality" invalid={!!errors.locality} /><FieldError show={!!errors.locality}>Select a locality.</FieldError></div>
+      <div><span className={label}>Locality *</span><LocalitySelect value={form.locality} onChange={(v) => pickLocality(v, '')} onSelect={(sel) => pickLocality(sel.name, sel.slug || '')} onBusyChange={onLocalityBusy} placeholder="Select locality" ariaLabel="Locality" invalid={!!errors.locality} /><FieldError show={!!errors.locality}>Select a locality.</FieldError></div>
       <div><label htmlFor="pob-address" className={label}>Full Address</label><textarea id="pob-address" value={form.address} maxLength={300} onChange={(e) => set('address', e.target.value)} placeholder="Flat no, wing, street..." rows={2} className={fld} /></div>
     </div>
   );
@@ -156,15 +157,15 @@ export function PricingStep({ form, set, errors }) {
       {rent && (
         <>
           <div><label htmlFor="pob-deposit" className={label}>Security Deposit *</label><div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-teal-400 font-semibold text-sm">₹</span><input id="pob-deposit" inputMode="numeric" {...money('deposit')} placeholder="e.g. 50,000" className={classNames(fld, 'pl-10', errors.deposit && errCls)} /></div>{errors.deposit ? <FieldError show>Enter the security deposit (0 if none).</FieldError> : moneyWords(form.deposit) && <p className="text-xs text-gray-400 mt-1.5 ml-1">{moneyWords(form.deposit)}</p>}<div className="flex flex-wrap gap-2 mt-2">{DEPOSIT_MONTHS[land ? 'land' : commercial ? 'commercial' : 'residential'].map((m) => <button key={m} type="button" onClick={() => setDepositMonths(m)} className="dz-chip">{m} month{m > 1 ? 's' : ''} rent</button>)}</div></div>
-          <div><label className={label}>Available From</label><AvailabilityField value={form.availableFrom} onChange={(v) => set('availableFrom', v)} ariaLabel="Available from date" className={fld} /></div>
+          <div><span className={label}>Available From</span><AvailabilityField value={form.availableFrom} onChange={(v) => set('availableFrom', v)} ariaLabel="Available from date" className={fld} /></div>
         </>
       )}
       {!rent && !land && (
         <>
-          <div><label className={label}>Possession</label><ChoiceBoxes value={form.possession} onChange={(v) => set('possession', v)} options={possessionOptions} ariaLabel="Possession status" cols="grid-cols-3" /></div>
+          <div><span className={label}>Possession</span><ChoiceBoxes value={form.possession} onChange={(v) => set('possession', v)} options={possessionOptions} ariaLabel="Possession status" cols="grid-cols-3" /></div>
           <div><label htmlFor="pob-rera" className={label}>RERA ID</label><input id="pob-rera" value={form.reraId} onChange={(e) => set('reraId', e.target.value)} placeholder="e.g. P52100012345" className={fld} /></div>
           {(form.possession === 'new' || form.possession === 'under') && (
-            <div><label className={label}>Available From</label><DateField value={form.availableFrom} onChange={(v) => set('availableFrom', v)} min={istToday()} max={addDaysIso(istToday(), MAX_POSSESSION_DAYS)} ariaLabel="Possession date" className={fld} /></div>
+            <div><span className={label}>Available From</span><DateField value={form.availableFrom} onChange={(v) => set('availableFrom', v)} min={istToday()} max={addDaysIso(istToday(), MAX_POSSESSION_DAYS)} ariaLabel="Possession date" className={fld} /></div>
           )}
         </>
       )}

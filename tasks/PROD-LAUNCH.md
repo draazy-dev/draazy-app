@@ -191,6 +191,18 @@ The agent prepares the lists; the owner does the clicks.
     variables `PROD_VITE_TURNSTILE_SITE_KEY`, `PROD_VITE_VAPID_PUBLIC_KEY`, `PROD_VITE_CASHFREE_MODE=production`,
     `PROD_VITE_PMF_MODE`, `PROD_VITE_POSTHOG_KEY` and `PROD_VITE_POSTHOG_APP_URL` (PostHog project `draazy-prod`);
     shared `VITE_GOOGLE_MAPS_MAP_ID`. Backend `TURNSTILE_ENABLED=true`
+- **Resume here (2026-11-20).** PR #14 merged (`9e6f5b3e`). DO project `draazy-prod` exists. All 39 `PROD_*` values pushed;
+  `PROD_INTERNAL_PROXIES=none` until §4's gate check, then `.*`. Pages `draazy-prod` has no variables yet.
+  Done: DO tokens `draazy-sandbox-deploy` / `draazy-prod-deploy` pushed as `*_DIGITALOCEAN_ACCESS_TOKEN`;
+  `draazy-prod-db` deleted 2026-11-20 to save cost (DO cannot pause it). Next, in order: (0) recreate it with the
+  same name (PG 17, blr1, 1 node, `db-s-1vcpu-1gb`, project `draazy-prod`) and rerun the role setup minus the
+  `flyway_schema_history` line; (1) merge PR #15; (2) run
+  `deploy-prod.yml` `target=backend`; (3) rerun the full `app-runtime-role.sql` (revokes `flyway_schema_history`);
+  (4) set `API_ORIGIN` (agent) and `ORIGIN_SHARED_SECRET` (owner, no prefix) on `draazy-prod`, then
+  `target=frontend`; (5) trusted sources = prod app only; (6) delete old DO tokens and the shared GitHub secret
+  `DIGITALOCEAN_ACCESS_TOKEN` (ask first; switch local `doctl` to the new token first).
+  Sandbox: rename the `draazy-sandbox` Pages secret `SANDBOX_ORIGIN_SHARED_SECRET` to `ORIGIN_SHARED_SECRET`, run
+  `deploy.yml`, move `sandbox.draazy.com` to `draazy-sandbox`, then delete the old `draazy` project (ask first).
 - [ ] **3.2 [OWNER] DigitalOcean:** a Managed PostgreSQL 17 cluster in `blr` with a standby node,
   daily backups and PITR, trusted sources = the prod app only, a schema-owner user plus the runtime
   role (`app-runtime-role.sql`). Create the prod app from `do-app-prod.yaml`. Add the alert policies and

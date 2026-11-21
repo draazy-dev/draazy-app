@@ -13,7 +13,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class RateLimitStoreConfig {
     static final String MEMORY = "memory";
     static final String REDIS = "redis";
-    static final String POSTGRES = "postgres";
+    static final String POSTGRES_STORE = "postgres";
 
     @Bean
     public WriteRateLimitStore.Factory writeRateLimitStores(
@@ -37,7 +37,7 @@ public class RateLimitStoreConfig {
         if (MEMORY.equals(choice)) {
             return InMemoryWriteRateLimitStore::new;
         }
-        if (POSTGRES.equals(choice)) {
+        if (POSTGRES_STORE.equals(choice)) {
             return postgres;
         }
         if (REDIS.equals(choice)) {
@@ -52,7 +52,7 @@ public class RateLimitStoreConfig {
             return (namespace, budget, window) ->
                     new RedisWriteRateLimitStore(redisEval, namespace, budget, window);
         }
-        throw new IllegalArgumentException("draazy.ratelimit.store must be '" + MEMORY + "', '" + POSTGRES
+        throw new IllegalArgumentException("draazy.ratelimit.store must be '" + MEMORY + "', '" + POSTGRES_STORE
                 + "' or '" + REDIS + "', got: " + store);
     }
 }

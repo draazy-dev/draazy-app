@@ -26,7 +26,7 @@ import {
 } from './flatmateModerationMapper.js';
 
 const signedIn = () => !!readAccessToken();
-const toList = (rows, fn) => (Array.isArray(rows) ? rows : []).map(fn);
+const toList = (rows, fn) => (Array.isArray(rows) ? rows : []).map((row) => fn(row));
 
 async function withConflictCode(run) {
   try {

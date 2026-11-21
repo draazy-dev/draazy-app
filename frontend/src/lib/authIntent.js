@@ -34,6 +34,11 @@ export function resolveAuthIntent(params) {
 
 const AUTH_SCREENS = ['/signin', '/signup', '/staff-login', '/staff-invite'];
 const SENTINEL_ORIGIN = 'https://draazy.invalid';
+const stripTrailingSlashes = (s) => {
+  let end = s.length;
+  while (end > 0 && s[end - 1] === '/') end--;
+  return s.slice(0, end);
+};
 const isSingleSafePath = (path) =>
   path.startsWith('/')
   && !path.startsWith('//')
@@ -57,7 +62,7 @@ export function safeInAppPath(raw) {
     return null;
   }
   if (!isSingleSafePath(path)) return null;
-  path = path.replace(/\/+$/, '').toLowerCase() || '/';
+  path = stripTrailingSlashes(path).toLowerCase() || '/';
   if (AUTH_SCREENS.includes(path)) return null;
   return next;
 }

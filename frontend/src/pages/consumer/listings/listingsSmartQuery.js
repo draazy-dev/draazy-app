@@ -208,25 +208,25 @@ function readMoney(eat, peek) {
   const rangeM = eat(RANGE_RE);
   if (rangeM) {
     const unit = rangeM[2] || rangeM[4];
-    const a = toRupees(parseFloat(rangeM[1]), unit);
-    const b = toRupees(parseFloat(rangeM[3]), rangeM[4] || unit);
+    const a = toRupees(Number.parseFloat(rangeM[1]), unit);
+    const b = toRupees(Number.parseFloat(rangeM[3]), rangeM[4] || unit);
     const hi = Math.max(a, b);
     return { lo: Math.min(a, b), hi, amount: hi, text: rangeM[0].trim() };
   }
   const maxM = eat(MAX_RE);
   if (maxM) {
-    const hi = toRupees(parseFloat(maxM[1]), maxM[2]);
+    const hi = toRupees(Number.parseFloat(maxM[1]), maxM[2]);
     return { lo: null, hi, amount: hi, text: maxM[0].trim() };
   }
   const minM = eat(MIN_RE);
   if (minM) {
-    const lo = toRupees(parseFloat(minM[1]), minM[2]);
+    const lo = toRupees(Number.parseFloat(minM[1]), minM[2]);
     return { lo, hi: null, amount: lo, text: minM[0].trim() };
   }
   const bareM = peek(BARE_RE);
-  if (bareM && (bareM[2] || parseFloat(bareM[1]) >= 1000)) {
+  if (bareM && (bareM[2] || Number.parseFloat(bareM[1]) >= 1000)) {
     eat(BARE_RE);
-    const hi = toRupees(parseFloat(bareM[1]), bareM[2]);
+    const hi = toRupees(Number.parseFloat(bareM[1]), bareM[2]);
     return { lo: null, hi, amount: hi, text: bareM[0].trim() };
   }
   return { lo: null, hi: null, amount: null, text: '' };
@@ -242,10 +242,10 @@ function applyMoney(next, isRent, money) {
 function applyArea(next, [, prefix, a, b]) {
   const [dLo, dHi] = defaultAreaRangeSqft(areaProfileForTypes(next.types, next.areaUnit));
   const clamp = (v) => Math.min(Math.max(Math.round(v), dLo), dHi);
-  const n = parseFloat(a);
+  const n = Number.parseFloat(a);
   let lo = n * 0.8;
   let hi = n * 1.2;
-  if (b != null) [lo, hi] = [Math.min(n, parseFloat(b)), Math.max(n, parseFloat(b))];
+  if (b != null) [lo, hi] = [Math.min(n, Number.parseFloat(b)), Math.max(n, Number.parseFloat(b))];
   else if (prefix) [lo, hi] = MAX_PREFIX_RE.test(prefix) ? [dLo, n] : [n, dHi];
   next.area = [clamp(lo), clamp(hi)];
 }

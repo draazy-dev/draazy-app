@@ -12,7 +12,7 @@ import lombok.Getter;
 @Table(name = "service_request_document_reviews")
 @Getter
 public class ServiceRequestDocumentReview extends BaseEntity {
-    static final String VERIFIED = "verified";
+    static final String VERIFIED_STATE = "verified";
     static final String REJECTED = "rejected";
 
     @Column(name = "service_request_id", nullable = false, updatable = false)
@@ -49,6 +49,6 @@ public class ServiceRequestDocumentReview extends BaseEntity {
     }
 
     boolean verified() {
-        return VERIFIED.equals(verdict);
+        return VERIFIED_STATE.equals(verdict);
     }
 }

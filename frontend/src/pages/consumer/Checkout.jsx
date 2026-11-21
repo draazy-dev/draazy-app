@@ -128,7 +128,7 @@ export default function Checkout() {
         timer = setTimeout(tick, POLL_MS);
       }
     };
-    tick();
+    void tick();
     return () => { alive = false; clearTimeout(timer); };
   }, [phase, needsProperty, propertyId, attemptKey, t]);
 

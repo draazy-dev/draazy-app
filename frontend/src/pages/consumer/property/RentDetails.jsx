@@ -51,7 +51,7 @@ export function RentDetails({ p }) {
     ].filter((f) => opts.includes(f));
     const signals = [];
     if (['bareShell', 'warmShell', 'furnished'].includes(p.shellType)) signals.push(tr('property.shell.' + p.shellType));
-    const wr = parseInt(p.washrooms, 10) || 0;
+    const wr = Number.parseInt(p.washrooms, 10) || 0;
     if (wr) signals.push(tr('property.washroom', { count: wr }));
     if (p.powerBackup) signals.push(tr('property.inventory.powerBackup'));
     if (p.pantry) signals.push(tr('property.pantry'));

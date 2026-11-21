@@ -5,7 +5,7 @@ const provider = createProvider('society');
 
 export const searchSocieties = async (query, localityLabel = '', { mapped = false } = {}) => {
   const rows = await (await provider()).searchSocieties(query, { mapped });
-  const locSlug = localityLabel ? localityLabel.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') : '';
+  const locSlug = localityLabel ? localityLabel.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : '';
   const locHead = locSlug.split('-')[0];
   const locMatch = (s) =>
     (locHead && s.localitySlug && (s.localitySlug === locSlug || s.localitySlug.startsWith(locHead))) ? 1 : 0;

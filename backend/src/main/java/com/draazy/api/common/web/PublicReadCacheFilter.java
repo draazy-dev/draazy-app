@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -172,5 +173,22 @@ public class PublicReadCacheFilter extends OncePerRequestFilter {
     }
 
     private record Entry(byte[] body, String contentType, String etag, long expiresAt) {
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof Entry that && Arrays.equals(body, that.body)
+                    && Objects.equals(contentType, that.contentType) && Objects.equals(etag, that.etag)
+                    && expiresAt == that.expiresAt;
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Objects.hash(contentType, etag, expiresAt) + Arrays.hashCode(body);
+        }
+
+        @Override
+        public String toString() {
+            return "Entry[bodyBytes=" + body.length + ", contentType=" + contentType + ", etag=" + etag
+                    + ", expiresAt=" + expiresAt + "]";
+        }
     }
 }

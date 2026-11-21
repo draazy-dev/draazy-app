@@ -129,6 +129,7 @@ class ServiceRequestTeamScopingTest extends ServiceFixtures {
             setStatus(legal, id, "assigned", 403);
             shareDraft(legal, id, 403);
             finalDoc(legal, id, 403);
+            expectStatus(buyer, id, "new");
         }
 
         @Test

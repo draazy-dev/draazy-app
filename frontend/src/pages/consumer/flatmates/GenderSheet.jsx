@@ -8,7 +8,7 @@ export default function GenderSheet({ onPick, onCancel, restrictedTo, kind }) {
   const panelRef = useModalDialog(true, onCancel);
   const who = t(restrictedTo === 'female' ? 'flatmates.genderWomen' : 'flatmates.genderMen');
   return (
-    <div className="sf-modal" onClick={onCancel}>
+    <div className="sf-modal" role="presentation" onClick={onCancel}>
       <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={t('flatmates.genderSheetTitle')} data-testid="gender-sheet" className="dz-modal-panel border border-white/10 rounded-3xl w-full max-w-sm p-6 outline-none" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-lg font-bold text-white">{t('flatmates.genderSheetTitle')}</h2>
         <p className="mt-1.5 text-sm text-gray-400">{t('flatmates.genderSheetBody', { kind: t(kind === 'group' ? 'flatmates.kindGroup' : 'flatmates.kindRoom'), who })}</p>

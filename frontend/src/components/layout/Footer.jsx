@@ -33,7 +33,7 @@ const FooterCol = ({ title, children }) => {
         aria-controls={panelId}
         className="w-full flex items-center justify-between gap-3 text-left min-h-[48px] sm:min-h-0 sm:cursor-default"
       >
-        <h4 className="text-xs font-semibold text-gray-400 tracking-widest uppercase mb-0 sm:mb-5">{title}</h4>
+        <h2 className="text-xs font-semibold text-gray-400 tracking-widest uppercase mb-0 sm:mb-5">{title}</h2>
         <Icon data-footer-chevron="" name="chevron-down" className={'w-4 h-4 text-gray-500 flex-shrink-0 transition-transform sm:hidden ' + (open ? 'rotate-180' : '')} />
       </button>
       <div id={panelId} className={(open ? 'block' : 'hidden') + ' sm:block pb-4 sm:pb-0 sm:pt-0'}>{children}</div>

@@ -54,7 +54,7 @@ class RentLoopTest extends AbstractApiTest {
                                 + "\"dueDay\":" + dueDay + "}"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
+        return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*", "$1");
     }
 
     private String dueMonth(User tenant) throws Exception {

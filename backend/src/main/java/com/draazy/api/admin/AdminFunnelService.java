@@ -39,12 +39,12 @@ public class AdminFunnelService {
                 union all
                 select 'deals', d.closed_at from deals d where d.status = 'closed' and d.closed_at is not null
             )
-            select stage, cast(date_trunc('week', at at time zone '%1$s') as date), count(*)
+            select stage, cast(date_trunc('week', at at time zone cast(:tz as text)) as date), count(*)
               from events
-             where (at at time zone '%1$s') >= cast(:from as date)
-               and (at at time zone '%1$s') <  cast(:to as date)
+             where (at at time zone cast(:tz as text)) >= cast(:from as date)
+               and (at at time zone cast(:tz as text)) <  cast(:to as date)
              group by 1, 2
-            """.formatted(PlatformTime.IST.getId());
+            """;
 
     private final EntityManager em;
 
@@ -70,6 +70,7 @@ public class AdminFunnelService {
         List<Object[]> rows = em.createNativeQuery(EVENTS)
                 .setParameter("from", from)
                 .setParameter("to", to)
+                .setParameter("tz", PlatformTime.IST.getId())
                 .getResultList();
         for (Object[] row : rows) {
             LocalDate week = row[1] instanceof java.sql.Date d ? d.toLocalDate() : (LocalDate) row[1];

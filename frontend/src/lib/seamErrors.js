@@ -18,7 +18,7 @@ export function reloadOnceForStaleShell() {
   } catch {
     return false;
   }
-  updateWorkerThenReload();
+  void updateWorkerThenReload();
   return true;
 }
 

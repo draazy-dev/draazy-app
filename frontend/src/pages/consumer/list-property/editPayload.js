@@ -19,8 +19,14 @@ const FIELD_INPUTS = {
   amenities: ['amenities'], desc: ['description'], video: ['youtubeId'],
 };
 
+const byString = (a, b) => {
+  const x = String(a);
+  const y = String(b);
+  return x < y ? -1 : x > y ? 1 : 0;
+};
+
 const same = (a, b) => (Array.isArray(a) && Array.isArray(b)
-  ? a.length === b.length && JSON.stringify([...a].sort()) === JSON.stringify([...b].sort())
+  ? a.length === b.length && JSON.stringify([...a].sort(byString)) === JSON.stringify([...b].sort(byString))
   : JSON.stringify(a) === JSON.stringify(b));
 
 export function editPayload(payload, form, original) {

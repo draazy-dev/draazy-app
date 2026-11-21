@@ -15,7 +15,7 @@ function haversineKm(lat1, lon1, lat2, lon2) {
 export const slugOfName = (name, index) => {
   const lower = String(name || '').trim().toLowerCase();
   for (const [slug, known] of index?.locNames || []) if (known.toLowerCase() === lower) return slug;
-  return lower.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return lower.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 };
 
 export function buildEntityIndex(listings, societies = []) {

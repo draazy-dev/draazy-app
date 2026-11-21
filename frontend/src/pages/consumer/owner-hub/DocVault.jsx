@@ -51,7 +51,7 @@ export default function DocVault({ mobile, propId, onChange }) {
     onChange?.(next.length);
   };
 
-  useEffect(() => { sync(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [mobile, propId]);
+  useEffect(() => { void sync(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [mobile, propId]);
 
   const onPick = async (e) => {
     const file = e.target.files && e.target.files[0];

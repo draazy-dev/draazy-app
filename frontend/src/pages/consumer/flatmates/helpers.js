@@ -91,7 +91,7 @@ const recencyMins = (item) => {
   if (item && item.createdAt) return (Date.now() - item.createdAt) / 60000;
   const t = ((item && item.time) || '').toLowerCase();
   if (!t || t.includes('just now') || t.includes('now')) return 0;
-  const m = t.match(/(\d+)\s*(min|hour|day|week)/);
+  const m = t.match(/(?:^|\D)(\d+)\s*(min|hour|day|week)/);
   if (!m) return 9e9;
   const n = +m[1];
   return m[2].startsWith('min') ? n : m[2].startsWith('hour') ? n * 60 : m[2].startsWith('day') ? n * 1440 : n * 10080;

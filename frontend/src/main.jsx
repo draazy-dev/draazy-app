@@ -86,13 +86,13 @@ if (isGatewayPopupReturn()) {
   window.close();
   root.render(<PaymentPopupReturn />);
 } else {
-  loadGeoPolicy();
+  void loadGeoPolicy();
   window.addEventListener('draazy-settings-change', loadGeoPolicy);
   // Sync readAccessToken() checks across the app assume a live session already holds its token at first render.
   const restored = !readAccessToken() && sessionHinted()
     ? Promise.race([restoreSession().catch(() => null), new Promise((r) => setTimeout(r, 5000))])
     : Promise.resolve();
-  restored.then(() => {
+  void restored.then(() => {
     if (readAccessToken()) primeMeBootstrap();
     root.render(app);
   });

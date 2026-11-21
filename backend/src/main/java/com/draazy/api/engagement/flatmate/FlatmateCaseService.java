@@ -8,9 +8,11 @@ import com.draazy.api.common.trust.FlatmateCaseFiles.CaseView;
 import com.draazy.api.security.AuthPrincipal;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -115,5 +117,20 @@ public class FlatmateCaseService {
     }
 
     private record Target(String kind, UUID[] parties) {
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof Target that && Objects.equals(kind, that.kind)
+                    && Arrays.equals(parties, that.parties);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Objects.hashCode(kind) + Arrays.hashCode(parties);
+        }
+
+        @Override
+        public String toString() {
+            return "Target[kind=" + kind + ", parties=" + Arrays.toString(parties) + "]";
+        }
     }
 }

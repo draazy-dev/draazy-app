@@ -59,7 +59,7 @@ class ListingAvailableOnTest extends AbstractApiTest {
 
     private String idOf(ResultActions created) throws Exception {
         return created.andExpect(status().isCreated()).andReturn().getResponse().getContentAsString()
-                .replaceAll("(?s).*?\"id\":\"([^\"]+)\".*", "$1");
+                .replaceAll("(?s)^.*?\"id\":\"([^\"]+)\".*", "$1");
     }
 
     private ResultActions detail(String id) throws Exception {
@@ -205,6 +205,6 @@ class ListingAvailableOnTest extends AbstractApiTest {
     private int count(String bucket) throws Exception {
         String json = mvc.perform(get("/properties?availableFrom=" + bucket + "&owner=" + owner.getId()))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-        return Integer.parseInt(json.replaceAll("(?s).*\"totalElements\"\\s*:\\s*(\\d+).*", "$1"));
+        return Integer.parseInt(json.replaceAll("(?s)^.*\"totalElements\"\\s*:\\s*(\\d+).*", "$1"));
     }
 }

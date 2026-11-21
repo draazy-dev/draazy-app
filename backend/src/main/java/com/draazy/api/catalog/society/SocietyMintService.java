@@ -264,7 +264,8 @@ public class SocietyMintService {
                 + (SocietySpecs.trimmed(locality) == null ? "" : " " + locality.trim());
         return joined.toLowerCase(Locale.ROOT).trim()
                 .replaceAll("[^a-z0-9]+", "-")
-                .replaceAll("^-+|-+$", "");
+                .replaceAll("^-+", "")
+                .replaceAll("([^-])-++$", "$1");
     }
 
     public record MintedSociety(SocietyResponse society, boolean created) {

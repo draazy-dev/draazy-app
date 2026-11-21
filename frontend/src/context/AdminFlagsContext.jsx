@@ -25,7 +25,7 @@ export function AdminFlagsProvider({ children }) {
     }).catch(() => {
       if (alive) setLoading(false);
     });
-    load();
+    void load();
     const onChange = () => load();
     window.addEventListener('draazy-settings-change', onChange);
     return () => { alive = false; window.removeEventListener('draazy-settings-change', onChange); };

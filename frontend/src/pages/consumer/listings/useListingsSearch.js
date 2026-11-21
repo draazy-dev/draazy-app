@@ -37,7 +37,7 @@ export default function useListingsSearch({ query, relaxedQuery = null, page = 1
       { signal: ctl.signal, fresh },
     );
 
-    (async () => {
+    void (async () => {
       try {
         const primary = await run(q, page);
         if (primary.total === 0 && relaxQ) {

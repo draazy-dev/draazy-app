@@ -272,9 +272,6 @@ public class IdentityVerificationService {
         v.setPersonKey(hasher.personKey(v.getClaimedName(), v.getClaimedDob()));
     }
 
-    private record PreparedImage(String kind, byte[] bytes, String contentType) {
-    }
-
     private static final long MAX_IMAGE_BYTES = 1_000_000L;
 
     private static final List<String> ALLOWED_IMAGE_TYPES =

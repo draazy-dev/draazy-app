@@ -4,7 +4,7 @@ const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const BARE_UUID = new RegExp(`^${UUID}$`, 'i');
 const TRAILING_UUID = new RegExp(`(?:^|-)(${UUID})$`, 'i');
 
-const words = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+const words = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 const NO_BHK_TYPE = /commercial|office|shop|showroom|retail|warehouse|godown|industrial|co-?working|plot|land/i;
 

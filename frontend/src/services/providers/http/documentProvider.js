@@ -54,7 +54,7 @@ export async function listDocRequests() {
 
 export async function respondDocRequest(mobile, reqId, decision, note) {
   await patch(`/me/documents/requests/${encodeURIComponent(reqId)}`, toStatusUpdate(decision, note));
-  const reqs = await listDocRequests(mobile);
+  const reqs = await listDocRequests();
   return reqs.find((r) => r.id === reqId) || null;
 }
 

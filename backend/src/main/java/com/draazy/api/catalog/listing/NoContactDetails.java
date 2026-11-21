@@ -33,7 +33,7 @@ public @interface NoContactDetails {
         private static final String DOT_WORD = "\\s?\\(?dot\\)?\\s?" + TLD;
         private static final String KNOWN_DOMAIN = "(?:" + PROVIDER + "|[\\p{L}0-9-]+(?:\\." + TLD + "|" + DOT_WORD + "))";
         private static final Pattern EMAIL = Pattern.compile(
-                "(?<![\\p{L}0-9._%+-])[\\p{L}0-9._%+-]++(?:@[\\p{L}0-9.-]+(?:\\.\\p{L}{2,}|" + DOT_WORD + ")|@" + PROVIDER
+                "(?<![\\p{L}0-9._%+-])[\\p{L}0-9._%+-][\\p{L}0-9._%+-]*+(?:@[\\p{L}0-9.-]+(?:\\.\\p{L}{2,}|" + DOT_WORD + ")|@" + PROVIDER
                         + "|\\s?(?:\\s@|@\\s|\\(at\\)|\\[at\\]| at(?:[\\s-]the[\\s-]rate)? )\\s?" + KNOWN_DOMAIN + ")",
                 Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 

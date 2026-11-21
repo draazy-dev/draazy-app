@@ -31,7 +31,7 @@ export function AuthProvider({ children }) {
     let cancelled = false;
     const mine = sessionGen.current;
     const stale = () => cancelled || sessionGen.current !== mine;
-    (async () => {
+    void (async () => {
       try {
         if (!readAccessToken() && !(sessionHinted() && await restoreSession())) {
           if (!stale()) {

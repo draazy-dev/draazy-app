@@ -67,7 +67,7 @@ export default function HScroll({
 
   return (
     <div className={classNames('relative', wrapClassName)}>
-      <div ref={ref} onClick={handleClick} className={classNames('hscroll-row overflow-x-auto no-scrollbar', className)} {...rest}>
+      <div ref={ref} role="presentation" onClick={handleClick} className={classNames('hscroll-row overflow-x-auto no-scrollbar', className)} {...rest}>
         {children}
       </div>
       <div

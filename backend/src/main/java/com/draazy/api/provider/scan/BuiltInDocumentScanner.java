@@ -2,9 +2,11 @@ package com.draazy.api.provider.scan;
 
 import com.draazy.api.provider.DocumentScanner;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -34,6 +36,21 @@ public class BuiltInDocumentScanner implements DocumentScanner {
             "lnk", "reg", "app", "dmg", "pkg", "deb", "rpm", "iso", "apk");
 
     private record Signature(String label, byte[] magic) {
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof Signature that && Objects.equals(label, that.label)
+                    && Arrays.equals(magic, that.magic);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Objects.hashCode(label) + Arrays.hashCode(magic);
+        }
+
+        @Override
+        public String toString() {
+            return "Signature[label=" + label + ", magic=" + Arrays.toString(magic) + "]";
+        }
     }
 
     private static final List<Signature> DANGEROUS_SIGNATURES = List.of(

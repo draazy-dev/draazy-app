@@ -20,6 +20,16 @@ import { useFormDraft, useFieldErrors } from '../lib/hooks.js';
 import { srcSetFor } from '../lib/imgSrcSet.js';
 
 const HERO_WIDTHS = [640, 960, 1280, 1600];
+
+const groupLakh = (digits) => {
+  let out = '';
+  for (let i = 0; i < digits.length; i++) {
+    const remaining = digits.length - i;
+    if (i > 0 && remaining >= 3 && remaining % 2 === 1) out += ',';
+    out += digits[i];
+  }
+  return out;
+};
 const CRUMB_KEY = { packers: 'packersMovers', legal: 'propertyLegal', loans: 'homeLoans' };
 
 export default function ServiceLanding({
@@ -167,7 +177,7 @@ export default function ServiceLanding({
                             ) : f.type === 'textarea' ? (
                               <textarea id={fieldId} rows={2} value={form[f.name]} onChange={(e) => { set(f.name, e.target.value); err.clear(f.name); }} placeholder={f.placeholder} className={'field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500 resize-none' + err.cx(f.name)} />
                             ) : f.type === 'money' ? (
-                              <input id={fieldId} type="text" inputMode="numeric" value={form[f.name]} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); const formatted = raw ? raw.replace(/\B(?=(\d{2})+(\d)(?!\d))/g, ',') : ''; set(f.name, formatted); err.clear(f.name); }} placeholder={f.placeholder} className={'field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500' + err.cx(f.name)} />
+                              <input id={fieldId} type="text" inputMode="numeric" value={form[f.name]} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); const formatted = raw ? groupLakh(raw) : ''; set(f.name, formatted); err.clear(f.name); }} placeholder={f.placeholder} className={'field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500' + err.cx(f.name)} />
                             ) : (
                               <input id={fieldId} type={f.type || 'text'} value={form[f.name]} onChange={(e) => { set(f.name, e.target.value); err.clear(f.name); }} placeholder={f.placeholder} className={'field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500' + err.cx(f.name)} />
                             )}

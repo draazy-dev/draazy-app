@@ -45,6 +45,9 @@ class SupportChatTimeline {
     private static final String MESSAGES = "select * from (" + MERGED
             + ") x where %s order by at desc, id desc limit :cap";
 
+    private static final String COUNT_ABOUT = "select count(*) from (" + MERGED
+            + ") x where x.about_type = :type and x.about_id = :about";
+
     private static final String UNREAD = """
             select (select count(*) from support_ticket_messages m join support_tickets t on t.id = m.ticket_id
                      where t.user_id = :user and t.unread and m.author_id is distinct from t.user_id
@@ -71,7 +74,7 @@ class SupportChatTimeline {
 
     /** Oldest first; `own` is how the customer's own messages are named to the reader ("me" or "user"). */
     List<Msg> messages(UUID userId, String own) {
-        return messages(userId, own, SupportChatScope.FULL);
+        return messages(userId, own, SupportChatScope.FULL_SCOPE);
     }
 
     List<Msg> messages(UUID userId, String own, SupportChatScope scope) {
@@ -79,7 +82,7 @@ class SupportChatTimeline {
     }
 
     Msg latestBy(UUID userId, UUID authorId, String own) {
-        List<Entry> recent = entries(userId, own, 20, SupportChatScope.FULL);
+        List<Entry> recent = entries(userId, own, 20, SupportChatScope.FULL_SCOPE);
         for (int i = recent.size() - 1; i >= 0; i--) {
             if (authorId.equals(recent.get(i).authorId())) {
                 return recent.get(i).msg();
@@ -89,8 +92,7 @@ class SupportChatTimeline {
     }
 
     int count(UUID userId, String aboutType, String aboutId) {
-        Integer count = jdbc.queryForObject("select count(*) from (" + MERGED
-                + ") x where x.about_type = :type and x.about_id = :about",
+        Integer count = jdbc.queryForObject(COUNT_ABOUT,
                 Map.of("user", userId, "type", aboutType, "about", aboutId), Integer.class);
         return count == null ? 0 : count;
     }
@@ -136,7 +138,7 @@ class SupportChatTimeline {
     }
 
     List<Case> cases(UUID userId) {
-        return cases(userId, SupportChatScope.FULL);
+        return cases(userId, SupportChatScope.FULL_SCOPE);
     }
 
     List<Case> cases(UUID userId, SupportChatScope scope) {

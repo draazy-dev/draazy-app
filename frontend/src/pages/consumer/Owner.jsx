@@ -183,7 +183,7 @@ export default function Owner() {
   const messageOwner = (e) => {
     if (!isIn) { sendToSignIn('contact', undefined, replay(e)); return; }
     if (latestListing) {
-        queuePendingChat(latestListing, { firstMessage: introText });
+        void queuePendingChat(latestListing, { firstMessage: introText });
       navigate(messagesLinkForProp(latestListing));
     } else {
       navigate('/contact');

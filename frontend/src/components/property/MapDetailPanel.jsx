@@ -100,7 +100,7 @@ export default function MapDetailPanel({ property: p, list, locName, activeIndex
     } else if (!chatEnabled) {
       setContactOpen(true);
     } else {
-      (async () => {
+      void (async () => {
         await queuePendingChat(p);
         navigate(messagesLinkForProp(p));
       })();

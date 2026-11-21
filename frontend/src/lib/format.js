@@ -1,4 +1,4 @@
-export const parseAmount = (s) => Math.round(parseFloat(String(s == null ? '' : s).replace(/[^\d.]/g, ''))) || 0;
+export const parseAmount = (s) => Math.round(Number.parseFloat(String(s == null ? '' : s).replace(/[^\d.]/g, ''))) || 0;
 
 export function isoToDisplay(iso) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '').trim());
@@ -17,7 +17,7 @@ export function fmtDateTime(value) {
   return text.replace(/\b(am|pm)\b/, (m) => m.toUpperCase());
 }
 
-const toMs = (v) => (v == null || v === '' ? NaN : typeof v === 'number' ? v : Date.parse(v));
+const toMs = (v) => (v == null || v === '' ? Number.NaN : typeof v === 'number' ? v : Date.parse(v));
 
 export function lastActivity(createdAt, ...later) {
   const created = toMs(createdAt);

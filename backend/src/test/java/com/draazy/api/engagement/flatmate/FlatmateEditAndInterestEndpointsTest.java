@@ -91,7 +91,7 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
     }
 
     private static String idOf(String json) {
-        return json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        return json.replaceAll("(?m)^.*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
     private String agreementEvidence(User host) {

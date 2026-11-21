@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Trans, useTranslation } from 'react-i18next';
 import { ArrowRight, BadgeCheck, CheckCircle2, IndianRupee, Loader2, Mail, Send, ShieldCheck, Smartphone, User, UserCircle, Users } from 'lucide-react';
@@ -101,6 +101,7 @@ export default function Signin() {
   const [saveError, setSaveError] = useState(null);
 
   const redirectTimer = useRef(null);
+  const focusOnMount = useCallback((el) => { el?.focus(); }, []);
   useEffect(() => () => clearTimeout(redirectTimer.current), []);
   const redirectTo = (to) => {
     redirectTimer.current = setTimeout(() => navigate(to, { replace: true }), 1000);
@@ -124,7 +125,7 @@ export default function Signin() {
       const who = await login({ mobile: mobile.value, otp: otp.otp, remember });
       const claim = params.get('claim');
       if (claim) recordClaimLinkOpened(claim).catch(() => {});
-      if (who && !who.name?.trim()) { redeemOnNewAccount(); setNeedsProfile(true); return; }
+      if (who && !who.name?.trim()) { void redeemOnNewAccount(); setNeedsProfile(true); return; }
       setDone(true);
       redirectTo(postAuthDest(params, claim ? '/dashboard#listings' : undefined));
     } catch (err) {
@@ -151,7 +152,7 @@ export default function Signin() {
     const nameVal = name.trim();
     if (!isValidName(nameVal)) errs.name = true;
     const emailVal = email.trim();
-    if (emailVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) errs.email = true;
+    if (emailVal && !/^[^\s@]+@[^\s@][^\s@.]*\.[^\s@]+$/.test(emailVal)) errs.email = true;
     setProfileErrs(errs);
     if (Object.keys(errs).length) return;
     setSaving(true);
@@ -186,7 +187,7 @@ export default function Signin() {
               <label htmlFor="profile-name" className="block text-sm font-medium text-gray-300 mb-2">{t('auth.fullName')} <span className="text-rose-400">*</span></label>
               <div className="relative">
                 <User className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input id="profile-name" autoFocus autoComplete="name" enterKeyHint="next" maxLength={80} aria-invalid={!!profileErrs.name} aria-describedby={profileErrs.name ? 'profile-name-err' : undefined} value={name} onChange={(e) => { setName(e.target.value); setProfileErrs((x) => ({ ...x, name: false })); }} type="text" placeholder={t('auth.fullNamePlaceholder')} className={'w-full pl-10 pr-4 py-3.5 bg-white/5 border rounded-xl text-white text-sm placeholder-gray-500 focus:outline-none transition-all ' + (profileErrs.name ? 'border-red-400' : 'border-white/10 focus:border-teal-400')} />
+                <input id="profile-name" ref={focusOnMount} autoComplete="name" enterKeyHint="next" maxLength={80} aria-invalid={!!profileErrs.name} aria-describedby={profileErrs.name ? 'profile-name-err' : undefined} value={name} onChange={(e) => { setName(e.target.value); setProfileErrs((x) => ({ ...x, name: false })); }} type="text" placeholder={t('auth.fullNamePlaceholder')} className={'w-full pl-10 pr-4 py-3.5 bg-white/5 border rounded-xl text-white text-sm placeholder-gray-500 focus:outline-none transition-all ' + (profileErrs.name ? 'border-red-400' : 'border-white/10 focus:border-teal-400')} />
               </div>
               {profileErrs.name ? <p id="profile-name-err" role="alert" className="text-red-400 text-xs mt-1.5 ml-1">{t('auth.errName')}</p> : null}
             </div>

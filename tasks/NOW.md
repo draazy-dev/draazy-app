@@ -26,7 +26,7 @@ REFER-SIMPLE is committed. REFER-KYC (caps 3/10, credit locked until both have K
 | What | Where | Size |
 |---|---|---|
 | Manual / smoke test plan | [docs/Draazy-Tester-Checklist.xlsx](../docs/Draazy-Tester-Checklist.xlsx) | 307 rows on 2026-10-15; stale, re-derive |
-| **Production launch plan** | [tasks/PROD-LAUNCH.md](PROD-LAUNCH.md) | 8 phases, AGENT/OWNER tagged, on 2026-11-19; prod does not exist yet |
+| **Production launch plan** | [tasks/PROD-LAUNCH.md](PROD-LAUNCH.md) | prod DB exists, app not yet deployed; resume at the 'Resume here' line above 3.2 (2026-11-20) |
 | Open dev work and verification | [tasks/todo.md](todo.md) | 3 items (REFER-KYC, REFER-FRIENDS, i18n route check) on 2026-11-08 |
 | Standing rulings | [tasks/DECISIONS-NEEDED.md](DECISIONS-NEEDED.md) | 81 lines on 2026-11-07 |
 | Durable rules and house style | [tasks/lessons.md](lessons.md) | 273 lines on 2026-11-07; grep |

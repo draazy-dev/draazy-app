@@ -34,7 +34,7 @@ jobs:
           VERSION: 8.30.1
           SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
         run: |
-          curl -sSfL --proto '=https' --tlsv1.2 -o /tmp/gitleaks.tgz \
+          curl -sSfL --proto '=https' --proto-redir '=https' --tlsv1.2 -o /tmp/gitleaks.tgz \
             "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
           echo "${SHA256}  /tmp/gitleaks.tgz" | sha256sum -c -
           tar -xzf /tmp/gitleaks.tgz -C /tmp gitleaks
@@ -69,7 +69,7 @@ jobs:
       # lockfile disagree, which is the check we want in CI.
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       # Split rather than `npm run check` so the failing gate is visible without opening logs.
       - name: Lint
@@ -84,6 +84,18 @@ jobs:
         working-directory: frontend
         run: npm run check:help
 
+      - name: Unit tests with coverage
+        working-directory: frontend
+        run: npm run test:unit -- --coverage
+
+      - name: Upload frontend coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/lcov.info
+          retention-days: 7
+
       - name: Build
         working-directory: frontend
         run: npm run build
@@ -94,11 +106,11 @@ jobs:
         run: npm run check:size
 
   lighthouse:
-    name: Lighthouse (mobile, record-only, no backend)
+    name: Lighthouse (mobile, canned API)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # No thresholds: runner CPU variance exceeds a real regression; budget only from main's recorded spread.
-    # The preview has no API, so only FCP/TBT mean anything here; deploy.yml measures sandbox with real data.
+    # No performance threshold: runner CPU variance exceeds a real regression; budget from main's recorded spread.
+    # A11y, best practices and SEO are CPU-independent: LH_ENFORCE gates them at run-lighthouse.mjs's floors.
     steps:
       - uses: actions/checkout@v7
 
@@ -110,7 +122,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       # A production build, not the dev server: unminified modules over hundreds of
       # requests would produce numbers that describe a machine no user has.
@@ -120,8 +132,13 @@ jobs:
 
       # --strictPort or Vite silently moves to 4174 and the poll below fails against an
       # empty port; stdout must go to a file or the backgrounded process hangs the step.
+      - name: Start canned API
+        run: node .github/lighthouse/mock-api.mjs > /tmp/mock-api.log 2>&1 &
+
       - name: Serve production build
         working-directory: frontend
+        env:
+          VITE_PROXY_TARGET: http://127.0.0.1:8080
         run: |
           npm run preview -- --host 127.0.0.1 --port 4173 --strictPort > /tmp/preview.log 2>&1 &
           for _ in $(seq 1 60); do
@@ -136,7 +153,13 @@ jobs:
           exit 1
 
       - name: Measure
+        env:
+          LH_ENFORCE: '1'
         run: node .github/lighthouse/run-lighthouse.mjs
+
+      - name: Canned API log
+        if: always()
+        run: cat /tmp/mock-api.log
 
       - name: Upload Lighthouse reports
         if: always()
@@ -207,9 +230,9 @@ jobs:
     name: SonarQube Cloud
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: backend
+    needs: [backend, checks]
     # Never `pull_request_target` (exposes SONAR_TOKEN to forks). Skipped on fork PRs and while
-    # private (not on the free plan); `always()` so a red backend suite is still analysed.
+    # private (not on the free plan); `always()` so a red test suite is still analysed.
     if: >-
       always() && !cancelled() &&
       !github.event.repository.private &&
@@ -257,9 +280,17 @@ jobs:
           name: backend-test-reports
           path: backend/target-cli/
 
+      # The path matches sonar.javascript.lcov.reportPaths.
+      - name: Download frontend coverage
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+
       # Configuration lives in sonar-project.properties at the repo root; this action reads it.
       # SONAR_TOKEN is a repository secret - rotate it in the SonarQube Cloud UI if ever leaked.
       - name: SonarQube scan
-        uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
+        uses: SonarSource/sonarqube-scan-action@59202af334b4ba7b5db01b701b8e79f8b3bef0f4 # v8.5.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

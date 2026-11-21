@@ -53,7 +53,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
       return;
     }
     track('contact_click', { action: 'request_number', id: propId });
-    captureLead({ context: 'request_number', property: propId });
+    void captureLead({ context: 'request_number', property: propId });
 
     const back = window.location.pathname + window.location.search;
     setBusy(true);
@@ -137,7 +137,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
       return;
     }
     track('contact_click', { action: 'start_chat', id: propId });
-    captureLead({ context: 'start_chat', property: propId });
+    void captureLead({ context: 'start_chat', property: propId });
     const back = window.location.pathname + window.location.search;
     setBusy(true);
     try {
@@ -158,7 +158,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
       return;
     }
     track('contact_click', { action: 'send_enquiry', id: propId });
-    captureLead({ context: 'send_enquiry', property: propId });
+    void captureLead({ context: 'send_enquiry', property: propId });
     const text = msg.trim();
     const back = window.location.pathname + window.location.search;
     setBusy(true);

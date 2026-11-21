@@ -52,7 +52,7 @@ public class AdminSettingsService {
     private static final int MAX_DISTRICT_NAME = 80;
 
     private static final java.util.regex.Pattern OFFICER_EMAIL =
-            java.util.regex.Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+            java.util.regex.Pattern.compile("[^@\\s]++@[^@\\s][^.@\\s]*+\\.[^@\\s]++");
 
     private final SettingRepository settings;
     private final SettingsCache cache;

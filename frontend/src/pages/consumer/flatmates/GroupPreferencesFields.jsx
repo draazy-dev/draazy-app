@@ -22,7 +22,7 @@ const labelCx = 'block text-sm font-medium text-gray-400 mb-2';
 export default function GroupPreferencesFields({ grp, setGrp, grpErr, onLocalityBusy, seatsField }) {
   const { t: tr } = useTranslation();
   const set = (patch, cleared) => { setGrp((g) => ({ ...g, ...patch })); if (cleared) grpErr.clear(cleared); };
-  const toggleBhk = (b) => set({ bhk: grp.bhk.includes(b) ? grp.bhk.filter((x) => x !== b) : [...grp.bhk, b].sort() });
+  const toggleBhk = (b) => set({ bhk: grp.bhk.includes(b) ? grp.bhk.filter((x) => x !== b) : [...grp.bhk, b].sort((x, y) => (x < y ? -1 : x > y ? 1 : 0)) });
   const money = (name, label, placeholder, required = false) => (
     <div data-err={name}>
       <AmountInput value={grp[name]} onChange={(v) => set({ [name]: v }, name)} className={grpErr.cx(name)} placeholder={placeholder} aria-label={label} aria-required={required || undefined} />

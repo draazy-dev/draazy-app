@@ -1,4 +1,4 @@
-// Record-only on purpose: one run on a shared runner varies more than a real regression (see ci.yml).
+// Performance is record-only (runner variance, see ci.yml); A11y/BP/SEO are CPU-independent, LH_ENFORCE=1 gates them.
 // It prints Lighthouse/Chrome versions and the CPU benchmark so a shift can be blamed on the app or the machine.
 
 import { spawnSync } from 'node:child_process';
@@ -12,6 +12,7 @@ const LIGHTHOUSE_VERSION = '13.4.1';
 
 const ORIGIN = process.env.LH_ORIGIN || 'http://127.0.0.1:4173';
 const OUT_DIR = resolve(process.env.LH_OUT_DIR || '.lighthouse');
+const ENFORCE = process.env.LH_ENFORCE === '1';
 
 async function featuredPropertyPath() {
   try {
@@ -23,7 +24,7 @@ async function featuredPropertyPath() {
   }
 }
 
-// The PR build is served without a backend: there is no listing to open, and home/listings render their empty state.
+// Without a reachable API there is no listing to open, and home/listings render their empty state.
 const detailPath = await featuredPropertyPath();
 const hasData = detailPath != null;
 
@@ -43,6 +44,13 @@ const METRICS = [
   { id: 'speed-index', label: 'SI' },
 ];
 
+// Floors sit at what main scores today: raise them as pages improve, never lower one to pass a PR.
+const GATED = [
+  { id: 'accessibility', label: 'A11y', floor: 100 },
+  { id: 'best-practices', label: 'BP', floor: 100 },
+  { id: 'seo', label: 'SEO', floor: 100 },
+];
+
 function runLighthouse(url, jsonPath) {
   // `npx --yes`, not a devDependency: adding one means regenerating the lockfile every `npm ci` job relies on.
   const args = [
@@ -50,7 +58,7 @@ function runLighthouse(url, jsonPath) {
     `lighthouse@${LIGHTHOUSE_VERSION}`,
     url,
     // Mobile is the default form factor; the one actually used is read back from the report and printed.
-    '--only-categories=performance',
+    `--only-categories=performance,${GATED.map((c) => c.id).join(',')}`,
     '--output=json',
     `--output-path=${jsonPath}`,
     // chrome-launcher defaults to headful, which fails on a display-less runner.
@@ -89,6 +97,7 @@ function fmt(audit) {
 mkdirSync(OUT_DIR, { recursive: true });
 
 const rows = [];
+const breaches = [];
 const record = {
   lighthouseVersion: LIGHTHOUSE_VERSION,
   chrome: chromeVersion(),
@@ -106,23 +115,37 @@ for (const route of ROUTES) {
 
   const lhr = runLighthouse(url, jsonPath);
   if (!lhr) {
-    rows.push(`| \`${route.path}\` | — | failed | failed | failed | failed | failed |`);
+    rows.push(`| \`${route.path}\` | — | ${[...METRICS, ...GATED].map(() => 'failed').join(' | ')} |`);
     record.routes.push({ ...route, ok: false });
     continue;
   }
 
   const audits = lhr.audits || {};
+  const pct = (id) => {
+    const s = lhr.categories?.[id]?.score;
+    return s == null ? null : Math.round(s * 100);
+  };
   const score = lhr.categories?.performance?.score;
   const cells = METRICS.map((m) => fmt(audits[m.id]));
+  const gated = GATED.map((c) => ({ ...c, score: pct(c.id) }));
 
   rows.push(
-    `| \`${route.path}\` | ${score == null ? 'n/a' : Math.round(score * 100)} | ${cells.join(' | ')} |`,
+    `| \`${route.path}\` | ${score == null ? 'n/a' : Math.round(score * 100)} | ${cells.join(' | ')} | `
+      + `${gated.map((c) => c.score ?? 'n/a').join(' | ')} |`,
   );
+
+  for (const c of gated.filter((g) => g.score == null || g.score < g.floor)) {
+    const failing = (lhr.categories[c.id]?.auditRefs || [])
+      .filter((ref) => ref.weight > 0 && audits[ref.id]?.score != null && audits[ref.id].score < 1)
+      .map((ref) => ref.id);
+    breaches.push(`${route.path}: ${c.label} ${c.score ?? 'n/a'} < ${c.floor} (failing: ${failing.join(', ') || 'n/a'})`);
+  }
 
   record.routes.push({
     ...route,
     ok: true,
     performanceScore: score == null ? null : Math.round(score * 100),
+    ...Object.fromEntries(gated.map((c) => [c.id, c.score])),
     formFactor: lhr.configSettings?.formFactor ?? 'unknown',
     metrics: Object.fromEntries(
       METRICS.map((m) => [m.id, audits[m.id]?.numericValue ?? null]),
@@ -139,17 +162,17 @@ writeFileSync(resolve(OUT_DIR, 'summary.json'), `${JSON.stringify(record, null, 
 const summary = [
   `## Lighthouse — mobile, record-only — ${ORIGIN}`,
   '',
-  '> No budgets. These numbers are recorded, never enforced — this job cannot fail a PR',
-  '> on a metric. See the `lighthouse` job in `.github/workflows/ci.yml` for why, and for what',
-  '> would have to be true before it becomes a gate.',
+  '> Performance and its timings are recorded, never enforced. '
+    + `${GATED.map((c) => `${c.label} ≥ ${c.floor}`).join(', ')} ${ENFORCE ? 'fail this job' : 'are reported only here'}.`,
+  '> See the `lighthouse` job in `.github/workflows/ci.yml` for why performance is not a gate.',
   '',
   ...(hasData ? [] : [
     `> **No listing data at ${ORIGIN}.** Home and listings rendered their empty/error state and the`,
     '> detail page was skipped, so read FCP and TBT here; LCP and CLS come from the post-deploy sandbox run.',
     '',
   ]),
-  `| Route | Perf | ${METRICS.map((m) => m.label).join(' | ')} |`,
-  `| --- | --- | ${METRICS.map(() => '---').join(' | ')} |`,
+  `| Route | Perf | ${[...METRICS, ...GATED].map((m) => m.label).join(' | ')} |`,
+  `| --- | --- | ${[...METRICS, ...GATED].map(() => '---').join(' | ')} |`,
   ...rows,
   '',
   `**Form factor:** ${record.formFactor ?? 'unknown'} · `
@@ -161,7 +184,7 @@ const summary = [
     + ' code; compare the benchmark index above before reading a change as a regression._',
   '_Full reports are in the `lighthouse-reports` artifact — drop a `.json` into'
     + ' <https://googlechrome.github.io/lighthouse/viewer/> to read it._',
-  '',
+  ...(breaches.length ? ['', '**Below floor:**', '', ...breaches.map((b) => `- ${b}`), ''] : []),
 ].join('\n');
 
 if (process.env.GITHUB_STEP_SUMMARY) {
@@ -173,5 +196,10 @@ console.log(`\n${summary}`);
 const anyOk = record.routes.some((r) => r.ok);
 if (!anyOk) {
   console.error('\nEvery Lighthouse run failed — the job is broken, not the app.');
+  process.exit(1);
+}
+
+if (ENFORCE && breaches.length) {
+  console.error(`\n${breaches.length} category score(s) below floor:\n${breaches.join('\n')}`);
   process.exit(1);
 }

@@ -86,7 +86,7 @@ const PendingChip = ({ label, title, onClick }) => {
   );
 };
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@][^\s@.]*\.[^\s@]+$/;
 
 export default function ProfileTab({ user, update, toast, isOwner }) {
   const { logout } = useAuth();

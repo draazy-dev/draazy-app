@@ -81,7 +81,7 @@ export default function CookieConsent() {
           </div>
           <p className="text-[13px] leading-snug text-gray-300 min-w-0">
             We use cookies to run and improve Draazy.{' '}
-            <Link to="/privacy" className="text-teal-400 hover:underline whitespace-nowrap">Privacy Policy</Link>
+            <Link to="/privacy" className="text-teal-400 underline whitespace-nowrap">Privacy Policy</Link>
           </p>
         </div>
         <div className="grid gap-2 min-[360px]:grid-cols-2 sm:flex sm:items-center shrink-0">
@@ -95,7 +95,7 @@ export default function CookieConsent() {
           <button
             type="button"
             onClick={() => persist(true)}
-            className="h-btn-sm inline-flex items-center justify-center rounded-lg bg-teal-500 px-4 text-[13px] font-semibold text-white hover:bg-teal-400 transition-colors whitespace-nowrap"
+            className="h-btn-sm inline-flex items-center justify-center rounded-lg bg-teal-700 px-4 text-[13px] font-semibold text-white hover:bg-teal-600 transition-colors whitespace-nowrap"
           >
             Accept all
           </button>

@@ -56,7 +56,7 @@ class TrackedRentTest extends AbstractApiTest {
                                 + "\"dueDay\":" + dueDay + "}"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
+        return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*", "$1");
     }
 
     private void recordMonth(User owner, String id, String month) throws Exception {

@@ -408,7 +408,7 @@ public class ListingEditRules {
     }
 
     private static boolean materialCarpetAreaChange(BigDecimal current, BigDecimal incoming) {
-        if (current == null || current.signum() == 0 || numericEquals(current, incoming)) {
+        if (current == null || current.signum() == 0 || incoming == null || numericEquals(current, incoming)) {
             return false;
         }
         BigDecimal delta = incoming.subtract(current).abs();
@@ -552,7 +552,7 @@ public class ListingEditRules {
 
     private static boolean numericEquals(BigDecimal a, BigDecimal b) {
         if (a == null || b == null) {
-            return Objects.equals(a, b);
+            return a == null && b == null;
         }
         return a.compareTo(b) == 0;
     }

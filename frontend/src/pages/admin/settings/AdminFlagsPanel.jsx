@@ -87,7 +87,7 @@ export default function AdminFlagsPanel({ adminFlags, onToggle }) {
                   </button>
 
                   {!config.critical && (
-                    <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <div className="shrink-0" role="presentation" onClick={(e) => e.stopPropagation()}>
                       <Switch
                         checked={sectionOn}
                         onChange={(v) => {

@@ -585,7 +585,7 @@ public class FlatmateSupplyService {
         }
         Map<String, Object> doc = new LinkedHashMap<>();
         doc.put("id", id);
-        for (String key : List.of("name", AgreementPeriod.FROM, AgreementPeriod.TILL)) {
+        for (String key : List.of("name", AgreementPeriod.FROM_KEY, AgreementPeriod.TILL_KEY)) {
             if (document.get(key) instanceof String value && !value.isBlank()) {
                 String kept = value.strip();
                 doc.put(key, kept.length() > MAX_DOC_FIELD ? kept.substring(0, MAX_DOC_FIELD) : kept);

@@ -241,7 +241,7 @@ class SocietyGoogleIdentityTest extends AbstractApiTest {
                                 FlatmateRoomFixture.BASICS, FlatmateRoomFixture.DETAILS)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        String id = json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        String id = json.replaceAll("(?m)^.*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
         return jdbc.queryForObject("select society from flatmate_rooms where id = ?::uuid", String.class, id);
     }
 
@@ -343,7 +343,7 @@ class SocietyGoogleIdentityTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON).content(roomBody(host, societyFields)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        return json.replaceAll("(?m)^.*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
     private void patchRoom(User host, String roomId, String societyFields, int expected) throws Exception {

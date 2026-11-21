@@ -142,8 +142,14 @@ export const societySitemapRow = (r) => (r.slug ? [`/society/${r.slug}`, null] :
 
 const ORIGIN = /^https:\/\/[A-Za-z0-9.-]+(?::\d+)?$/;
 
+const stripTrailingSlashes = (s) => {
+  let end = s.length;
+  while (end > 0 && s[end - 1] === '/') end--;
+  return s.slice(0, end);
+};
+
 export async function apiGet(env, request, path) {
-  const origin = (env.API_ORIGIN || '').trim().replace(/\/+$/, '');
+  const origin = stripTrailingSlashes((env.API_ORIGIN || '').trim());
   const secret = (env.ORIGIN_SHARED_SECRET || '').trim();
   if (!ORIGIN.test(origin) || !secret) return { status: 0 };
   const headers = { Accept: 'application/json', 'X-Proxy-Auth': secret, 'X-Forwarded-Proto': 'https' };

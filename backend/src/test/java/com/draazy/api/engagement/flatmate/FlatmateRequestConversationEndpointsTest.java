@@ -50,7 +50,7 @@ class FlatmateRequestConversationEndpointsTest extends AbstractApiTest {
     }
 
     private static String idOf(String json) {
-        return json.replaceAll("(?s).*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        return json.replaceAll("(?s)^.*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
     private String room(User host) throws Exception {

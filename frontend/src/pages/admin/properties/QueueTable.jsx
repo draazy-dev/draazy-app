@@ -28,7 +28,7 @@ const elapsed = (hours) => (hours < 1 ? `${Math.max(1, Math.round(hours * 60))}m
 function waitState(l, tab) {
   const rule = WAIT[tab] || POSTED;
   const at = rule.at(l);
-  const t = at ? new Date(at).getTime() : NaN;
+  const t = at ? new Date(at).getTime() : Number.NaN;
   const hours = Number.isNaN(t) ? 0 : Math.max(0, (Date.now() - t) / 3600000);
   const ago = Number.isNaN(t) ? '' : elapsed(hours);
   const tone = rule.breach && hours >= rule.breach ? 'breach' : rule.warn && hours >= rule.warn ? 'warn' : 'ok';

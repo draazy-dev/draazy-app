@@ -12,6 +12,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 import java.util.UUID;
 import javax.sql.DataSource;
@@ -221,7 +222,7 @@ public class SavedSearchService {
                 }
                 int count = counted[0];
                 Instant alertedAt = count > 0 && isAlertDue(search, now) ? alert(search, count, now) : alerted;
-                if (count != search.getNewCount() || alertedAt != alerted) {
+                if (count != search.getNewCount() || !Objects.equals(alertedAt, alerted)) {
                     search.setNewCount(count);
                     search.setLastAlertedAt(alertedAt);
                     updated++;

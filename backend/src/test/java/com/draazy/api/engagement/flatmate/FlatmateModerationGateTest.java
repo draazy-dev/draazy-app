@@ -50,7 +50,7 @@ class FlatmateModerationGateTest extends AbstractApiTest {
     }
 
     private static String idIn(String json) {
-        return json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        return json.replaceAll("(?m)^.*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
     private String createPost(User author, String name, String locality) throws Exception {
