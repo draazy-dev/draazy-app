@@ -21,7 +21,7 @@ public final class DocumentReviewFixture {
                     category + ".png", "documents/service-requests/" + id + "/" + UUID.randomUUID(), 1L,
                     "image/png"));
             ServiceRequestDocumentReview review = new ServiceRequestDocumentReview(id, filed.getId());
-            review.decide(ServiceRequestDocumentReview.VERIFIED, null, null, Instant.now());
+            review.decide(ServiceRequestDocumentReview.VERIFIED_STATE, null, null, Instant.now());
             reviews.saveAndFlush(review);
         }
     }

@@ -171,7 +171,8 @@ public class LocalityPlaceService {
     static String slugify(String name) {
         return name.toLowerCase(Locale.ROOT).trim()
                 .replaceAll("[^a-z0-9]+", "-")
-                .replaceAll("^-+|-+$", "");
+                .replaceAll("^-+", "")
+                .replaceAll("([^-])-++$", "$1");
     }
 
     private static double haversineKm(double lat1, double lng1, double lat2, double lng2) {

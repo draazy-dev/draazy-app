@@ -157,8 +157,8 @@ class SourceTreeHygieneTest {
         String stripped = text
                 .replaceAll("(?s)/\\*.*?\\*/", "")
                 .replaceAll("//[^\\n]*", "")
-                .replaceAll("(?m)^\\s*package\\s+[^;]+;", "")
-                .replaceAll("(?m)^\\s*import\\s+[^;]+;", "")
+                .replaceAll("(?m)^\\s*package\\s[^;]++;", "")
+                .replaceAll("(?m)^\\s*import\\s[^;]++;", "")
                 .trim();
         return stripped.isEmpty();
     }

@@ -75,7 +75,7 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
                         .content(FlatmateGroupFixture.hunting(title, "Kothrud", "any", 45000, 3, 1)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        String id = json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        String id = json.replaceAll("(?m)^.*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
         jdbc.update("update flatmate_groups set mod_status = 'approved' where id = ?::uuid", id);
         em.clear();
         return id;
@@ -88,7 +88,7 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
                         .content("{\"listingId\":\"" + listing.getId() + "\"}"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        return json.replaceAll("(?m)^.*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
     @Nested

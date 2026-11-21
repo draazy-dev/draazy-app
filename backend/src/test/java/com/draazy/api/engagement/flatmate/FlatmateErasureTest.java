@@ -60,7 +60,7 @@ class FlatmateErasureTest extends AbstractApiTest {
                         .content(FlatmateGroupFixture.hunting("Team up in Baner", "Baner", "any")))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        String id = json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        String id = json.replaceAll("(?m)^.*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
         jdbc.update("update flatmate_groups set mod_status = 'approved' where id = ?::uuid", id);
         entityManager.clear();
         return id;
@@ -73,7 +73,7 @@ class FlatmateErasureTest extends AbstractApiTest {
                         .content("{\"reason\":\"Moving away\"}"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        String requestId = body.replaceAll("^.*\"id\":\"([^\"]+)\".*$", "$1");
+        String requestId = body.replaceAll("^.*\"id\":\"([^\"]+)\".*", "$1");
         mvc.perform(patch("/admin/erasure-requests/{id}", requestId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(admin))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -134,7 +134,7 @@ class FlatmateErasureTest extends AbstractApiTest {
                         .content("{\"name\":\"Asha\",\"budget\":18000,\"localities\":[\"Baner\"]}"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString()
-                .replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+                .replaceAll("(?m)^.*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
         mvc.perform(post(Routes.Flatmates.POST_INTEREST, postId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(asker))
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))

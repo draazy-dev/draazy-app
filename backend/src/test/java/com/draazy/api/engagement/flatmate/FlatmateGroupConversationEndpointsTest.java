@@ -67,7 +67,7 @@ class FlatmateGroupConversationEndpointsTest extends AbstractApiTest {
     }
 
     private static String idIn(String json) {
-        return json.replaceAll("(?s).*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        return json.replaceAll("(?s)^.*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
     private void join(String groupId, User host, User who) throws Exception {

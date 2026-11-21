@@ -44,7 +44,7 @@ class ManagedPropertyDocumentTest extends AbstractApiTest {
                                 + "\"price\":25000,\"locality\":\"" + locality + "\"}"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
+        return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*", "$1");
     }
 
     private static MockMultipartFile pdf(String name) {
@@ -59,7 +59,7 @@ class ManagedPropertyDocumentTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
+        return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*", "$1");
     }
 
     @Test

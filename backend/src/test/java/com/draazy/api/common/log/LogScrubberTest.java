@@ -140,4 +140,11 @@ class LogScrubberTest {
         LogScrubber.scrub(hostile);
         assertThat((System.nanoTime() - started) / 1_000_000).isLessThan(2_000);
     }
+
+    @Test
+    void inputThatOverflowsTheMatcherIsWithheldNotThrown() {
+        String hostile = "a@" + "b.".repeat(50_000) + "com";
+        assertThat(LogScrubber.scrub(hostile)).isEqualTo("[unscrubbable]");
+        assertThat(LogScrubber.scrub(hostile, 8000)).isEqualTo("[unscrubbable]");
+    }
 }

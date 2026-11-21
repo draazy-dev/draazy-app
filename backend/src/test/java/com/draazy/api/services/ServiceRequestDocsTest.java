@@ -124,6 +124,11 @@ class ServiceRequestDocsTest extends ServiceFixtures {
         String id = raise(mine, "rent-agreement", listing(mine));
 
         upload(theirs, id, "Aadhaar", 404);
+
+        mvc.perform(get(Routes.ServiceRequests.BY_ID, id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(mine)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documents", hasSize(0)));
     }
 
     @Test

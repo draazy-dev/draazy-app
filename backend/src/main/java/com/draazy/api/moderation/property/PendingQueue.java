@@ -23,6 +23,10 @@ public class PendingQueue {
              order by p.createdAt %s, p.id desc
             """;
 
+    private static final String ROWS_OLDEST_FIRST = ROWS.formatted("asc");
+
+    private static final String ROWS_NEWEST_FIRST = ROWS.formatted("desc");
+
     private static final String COUNTS = """
             select sum(case when p.status = :pending then 1 else 0 end),
                    sum(case when p.status = :flagged then 1 else 0 end),
@@ -42,7 +46,7 @@ public class PendingQueue {
     @Transactional(readOnly = true)
     @SuppressWarnings("unchecked")
     public List<Row> pending(int limit, boolean oldestFirst) {
-        List<Object[]> rows = em.createQuery(ROWS.formatted(oldestFirst ? "asc" : "desc"))
+        List<Object[]> rows = em.createQuery(oldestFirst ? ROWS_OLDEST_FIRST : ROWS_NEWEST_FIRST)
                 .setParameter("pending", PropertyStatus.PENDING)
                 .setMaxResults(limit)
                 .getResultList();

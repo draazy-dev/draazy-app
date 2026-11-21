@@ -648,7 +648,7 @@ class ListingSearchTest extends AbstractApiTest {
             String body = mvc.perform(get("/properties?" + query))
                     .andExpect(status().isOk())
                     .andReturn().getResponse().getContentAsString();
-            return Long.parseLong(body.replaceAll("(?s).*\"totalElements\"\\s*:\\s*(\\d+).*", "$1"));
+            return Long.parseLong(body.replaceAll("(?s)^.*\"totalElements\"\\s*:\\s*(\\d+).*", "$1"));
         }
 
         @Test

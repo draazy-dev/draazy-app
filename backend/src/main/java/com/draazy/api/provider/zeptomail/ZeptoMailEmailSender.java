@@ -50,7 +50,7 @@ class ZeptoMailEmailSender implements EmailSender {
         timeouts.setReadTimeout(RESPONSE_TIMEOUT);
         this.http = RestClient.builder()
                 .requestFactory(timeouts)
-                .baseUrl(props.baseUrl().replaceAll("/+$", ""))
+                .baseUrl(props.baseUrl().replaceAll("([^/]|^)/++$", "$1"))
                 .defaultHeader("Authorization", authorization)
                 .defaultHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
                 .defaultHeader("Accept", MediaType.APPLICATION_JSON_VALUE)

@@ -37,7 +37,7 @@ class StaffEmailCopy {
     StaffEmailCopy(UserRepository users, EmailSender email, String baseUrl, Executor sender) {
         this.users = users;
         this.email = email;
-        this.baseUrl = baseUrl.replaceAll("/+$", "");
+        this.baseUrl = baseUrl.replaceAll("([^/]|^)/++$", "$1");
         this.sender = sender;
     }
 

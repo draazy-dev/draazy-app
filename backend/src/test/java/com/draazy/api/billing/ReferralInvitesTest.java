@@ -85,7 +85,7 @@ class ReferralInvitesTest extends AbstractApiTest {
     private String codeOf(User u) throws Exception {
         String body = mvc.perform(get(Routes.Referrals.MINE).header(HttpHeaders.AUTHORIZATION, bearer(u)))
                 .andReturn().getResponse().getContentAsString();
-        return body.replaceAll("(?s).*\"code\":\"([^\"]+)\".*", "$1");
+        return body.replaceAll("(?s)^.*\"code\":\"([^\"]+)\".*", "$1");
     }
 
     @Test

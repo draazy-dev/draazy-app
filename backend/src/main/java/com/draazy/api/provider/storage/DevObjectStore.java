@@ -14,6 +14,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.HexFormat;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 import javax.crypto.Mac;
@@ -161,7 +162,23 @@ public class DevObjectStore {
         }
     }
 
-    record Stored(byte[] content, String contentType) {}
+    record Stored(byte[] content, String contentType) {
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof Stored that && Arrays.equals(content, that.content)
+                    && Objects.equals(contentType, that.contentType);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Objects.hashCode(contentType) + Arrays.hashCode(content);
+        }
+
+        @Override
+        public String toString() {
+            return "Stored[content=" + content.length + " bytes, contentType=" + contentType + "]";
+        }
+    }
 
     private Optional<Path> resolve(String key) {
         if (key == null || key.isBlank() || key.endsWith(TYPE_SUFFIX)) {

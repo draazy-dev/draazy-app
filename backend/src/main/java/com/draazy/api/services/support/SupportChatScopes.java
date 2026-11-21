@@ -25,11 +25,11 @@ class SupportChatScopes {
 
     SupportChatScope resolve(String role, UUID userId) {
         if (Roles.Wire.ADMIN.equals(role) || Roles.Wire.MANAGER.equals(role)) {
-            return SupportChatScope.FULL;
+            return SupportChatScope.FULL_SCOPE;
         }
         Set<String> functions = permissions.functionsFor(role, userId);
         if (functions.contains(BackOfficeFunctions.SUPPORT)) {
-            return SupportChatScope.FULL;
+            return SupportChatScope.FULL_SCOPE;
         }
         Set<String> contexts = new LinkedHashSet<>();
         if (functions.contains(BackOfficeFunctions.LISTING_MODERATION)

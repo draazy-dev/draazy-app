@@ -18,7 +18,7 @@ final class LeadVocabulary {
     static final Set<String> STAGES = Set.of(NEW, CONTACTED, INTERESTED, CONVERTED, LOST, NOT_REACHABLE,
             DO_NOT_CALL);
     static final Set<String> OPEN_STAGES = Set.of(NEW, CONTACTED, INTERESTED);
-    static final Set<String> SERVICES = Set.of("rent-agreement", "legal", "interior", "packers", "valuation",
+    static final Set<String> SERVICE_NAMES = Set.of("rent-agreement", "legal", "interior", "packers", "valuation",
             "loans", "listing", "home-search");
     static final Set<String> CHANNELS = Set.of("call", "whatsapp", "sms");
     static final Set<String> OUTCOMES = Set.of("connected", "no-answer", "busy", "switched-off", "wrong-number",
@@ -51,7 +51,7 @@ final class LeadVocabulary {
     }
 
     static List<String> services(List<String> requested) {
-        return pick(SERVICES, requested, "service");
+        return pick(SERVICE_NAMES, requested, "service");
     }
 
     static List<String> pick(Set<String> allowed, List<String> requested, String label) {

@@ -706,7 +706,7 @@ class ModerationBehaviourTest extends AbstractApiTest {
                         .content("{\"targetType\":\"property\",\"targetId\":\"p-9\",\"reason\":\"fake\"}"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        String id = created.replaceAll(".*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        String id = created.replaceAll("(?m)^.*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
 
         mvc.perform(patch("/reports/{id}", id).header(HttpHeaders.AUTHORIZATION, bearer(staff))
                         .contentType(MediaType.APPLICATION_JSON)

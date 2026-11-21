@@ -18,7 +18,7 @@ public class RefreshCookie {
 
     // Unprefixed half of the name; the cookie actually sent is name(), so never read a live
     // request with this constant.
-    public static final String NAME = "draazy_rt";
+    public static final String BASE_NAME = "draazy_rt";
 
     public static final String HINT_NAME = "draazy_session";
 
@@ -41,7 +41,7 @@ public class RefreshCookie {
     }
 
     public String name() {
-        return secure ? HOST_PREFIX + NAME : NAME;
+        return secure ? HOST_PREFIX + BASE_NAME : BASE_NAME;
     }
 
     public String hintName() {

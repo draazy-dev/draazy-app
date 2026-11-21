@@ -34,6 +34,7 @@ class CityAdminEndpointTest extends AbstractApiTest {
             jdbc.update("delete from audit_log where actor = ?", adminId);
         }
         jdbc.update("update cities set live = (slug = 'pune')");
+        jdbc.update("delete from city_waitlist where mobile like '98777320%'");
     }
 
     private String token(String mobile, String role) {
@@ -116,11 +117,6 @@ class CityAdminEndpointTest extends AbstractApiTest {
     private void waitlisted(String mobile, String city, String createdAt) {
         jdbc.update("insert into city_waitlist (mobile, city, created_at) values (?, ?, ?::timestamptz)",
                 mobile, city, createdAt);
-    }
-
-    @AfterEach
-    void clearWaitlist() {
-        jdbc.update("delete from city_waitlist where mobile like '98777320%'");
     }
 
     @Test

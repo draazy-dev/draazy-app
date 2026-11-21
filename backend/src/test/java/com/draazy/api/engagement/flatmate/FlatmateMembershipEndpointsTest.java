@@ -66,7 +66,7 @@ class FlatmateMembershipEndpointsTest extends AbstractApiTest {
                         .content(FlatmateGroupFixture.hunting("Team up in Baner", "Baner", policy)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        String id = json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        String id = json.replaceAll("(?m)^.*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
         em.flush();
         jdbc.update("update flatmate_groups set mod_status = 'approved' where id = ?::uuid", id);
         em.clear();

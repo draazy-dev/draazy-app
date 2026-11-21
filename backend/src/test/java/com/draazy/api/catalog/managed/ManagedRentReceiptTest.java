@@ -53,7 +53,7 @@ class ManagedRentReceiptTest extends AbstractApiTest {
                         .content(body))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
+        return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*", "$1");
     }
 
     private void patchProperty(User o, String id, String body) throws Exception {
@@ -142,7 +142,7 @@ class ManagedRentReceiptTest extends AbstractApiTest {
         User o = owner("9861004003", "Asha Patil");
         String id = rentedFlat(o);
         String created = recordMonth(o, id, MONTH_2);
-        String receiptId = created.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
+        String receiptId = created.replaceAll("^.*?\"id\":\"([^\"]+)\".*", "$1");
 
         assertThat(receiptId).isNotBlank();
         mvc.perform(get(receipts(id)).header(HttpHeaders.AUTHORIZATION, bearer(o)))
@@ -287,7 +287,7 @@ class ManagedRentReceiptTest extends AbstractApiTest {
         User o = owner("9861004030", "Asha Patil");
         String id = rentedFlat(o);
         String first = recordMonth(o, id, MONTH_2);
-        String firstReceiptId = first.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
+        String firstReceiptId = first.replaceAll("^.*?\"id\":\"([^\"]+)\".*", "$1");
 
         mvc.perform(post(receipts(id))
                         .header(HttpHeaders.AUTHORIZATION, bearer(o))

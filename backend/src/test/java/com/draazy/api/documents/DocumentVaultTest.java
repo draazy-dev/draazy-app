@@ -66,7 +66,7 @@ class DocumentVaultTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
+        return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*", "$1");
     }
 
     @Test
@@ -237,7 +237,7 @@ class DocumentVaultTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
+        return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*", "$1");
     }
 
     @Test

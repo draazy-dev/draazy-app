@@ -6,12 +6,12 @@ import java.time.format.DateTimeParseException;
 import java.util.Map;
 
 record AgreementPeriod(LocalDate from, LocalDate till) {
-    static final String FROM = "validFrom";
-    static final String TILL = "validTill";
+    static final String FROM_KEY = "validFrom";
+    static final String TILL_KEY = "validTill";
 
     static AgreementPeriod of(Map<String, Object> doc, LocalDate today) {
-        LocalDate from = date(doc, FROM);
-        LocalDate till = date(doc, TILL);
+        LocalDate from = date(doc, FROM_KEY);
+        LocalDate till = date(doc, TILL_KEY);
         if (!till.isAfter(from)) {
             throw new ValidationException("agreementDoc.validTill must be after agreementDoc.validFrom.");
         }

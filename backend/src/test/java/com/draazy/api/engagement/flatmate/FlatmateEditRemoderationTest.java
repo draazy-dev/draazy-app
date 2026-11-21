@@ -75,7 +75,7 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
     }
 
     private static String idIn(String json) {
-        return json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        return json.replaceAll("(?m)^.*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
     private static String roomBody(String locality, String society, String roomType, int rent,
@@ -604,6 +604,6 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
 
     private static String stampOf(String queueJson, String id) {
         String afterId = queueJson.substring(queueJson.indexOf("\"id\":\"" + id + "\""));
-        return afterId.replaceAll("(?s).*?\"recheckRequestedAt\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        return afterId.replaceAll("(?s)^.*?\"recheckRequestedAt\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 }

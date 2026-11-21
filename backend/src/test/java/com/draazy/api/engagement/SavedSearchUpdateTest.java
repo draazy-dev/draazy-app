@@ -35,7 +35,7 @@ class SavedSearchUpdateTest extends AbstractApiTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.alertFrequency").value("daily"))
                 .andReturn().getResponse().getContentAsString();
-        return body.replaceAll("(?s).*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        return body.replaceAll("(?s)^.*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
     @Test
@@ -146,7 +146,7 @@ class SavedSearchUpdateTest extends AbstractApiTest {
                         .content("{\"kind\":\"flatmates\",\"criteria\":{\"tab\":\"rooms\"}}"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        String id = body.replaceAll("(?s).*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        String id = body.replaceAll("(?s)^.*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
 
         mvc.perform(patch("/me/saved-searches/" + id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(u))

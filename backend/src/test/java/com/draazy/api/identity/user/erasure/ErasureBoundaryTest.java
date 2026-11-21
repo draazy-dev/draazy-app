@@ -73,7 +73,7 @@ class ErasureBoundaryTest extends AbstractApiTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("pending"))
                 .andReturn().getResponse().getContentAsString();
-        return body.replaceAll("^.*\"id\":\"([^\"]+)\".*$", "$1");
+        return body.replaceAll("^.*\"id\":\"([^\"]+)\".*", "$1");
     }
 
     @Test

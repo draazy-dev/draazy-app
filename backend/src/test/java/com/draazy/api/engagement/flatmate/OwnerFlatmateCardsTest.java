@@ -56,7 +56,7 @@ class OwnerFlatmateCardsTest extends AbstractApiTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        String id = json.replaceAll(".*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        String id = json.replaceAll("(?m)^.*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
         jdbc.update("update flatmate_seeker_posts set mod_status = 'approved' where id = ?::uuid", id);
         return id;
     }
@@ -94,7 +94,7 @@ class OwnerFlatmateCardsTest extends AbstractApiTest {
                             .content(FlatmateGroupFixture.hunting("Card group", "Baner", "any", 40000, 3, 1)))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();
-            String id = json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+            String id = json.replaceAll("(?m)^.*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
 
             mvc.perform(get(Routes.Flatmates.MY_GROUPS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host)))

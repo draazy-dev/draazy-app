@@ -9,19 +9,17 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class AdminMetricsRepository {
-    private static final String IST = PlatformTime.IST.getId();
-
     private static final String MONEY = """
-            select i.id, i.number, i.user_id, cast((i.issued_at at time zone '%1$s') as date) as day,
+            select i.id, i.number, i.user_id, cast((i.issued_at at time zone cast(:tz as text)) as date) as day,
                    case when i.source_type = 'subscription' then 'subscription' else 'service' end as source,
                    false as refund, i.amount as gross, i.taxable_amount as fee
               from invoices i
             union all
-            select c.id, c.number, c.user_id, cast((c.issued_at at time zone '%1$s') as date),
+            select c.id, c.number, c.user_id, cast((c.issued_at at time zone cast(:tz as text)) as date),
                    case when c.source_type = 'subscription' then 'subscription' else 'service' end,
                    true, -c.amount, -c.taxable_amount
               from credit_notes c
-            """.formatted(IST);
+            """;
 
     private static final String WINDOW = """
              where (cast(:from as date) is null or day >= cast(:from as date))
@@ -106,6 +104,25 @@ public class AdminMetricsRepository {
     private static final String LEDGER_PROJECTION =
             "select id, occurred_on, number, party, kind, amount, fee from ";
 
+    private static final String LEDGER = LEDGER_PROJECTION + "(" + LEDGER_ROWS + ") ledger" + LEDGER_FILTER
+            + " order by occurred_on desc nulls last, number desc, id limit :limit offset :offset";
+
+    private static final String LEDGER_COUNT = "select count(*) from (" + LEDGER_ROWS + ") ledger" + LEDGER_FILTER;
+
+    private static final String COUNT_LISTINGS = """
+            select count(*) from properties
+             where archived = false
+               and (cast(:status as text) is null or status = cast(:status as text))
+            """;
+
+    private static final String COUNT_USERS = """
+            select count(*) from users
+             where archived = false
+               and (cast(:d as integer) is null
+                    or (joined_at at time zone cast(:tz as text))
+                       >= (now() at time zone cast(:tz as text)) - make_interval(days => cast(:d as integer)))
+            """;
+
     private final EntityManager em;
 
     public AdminMetricsRepository(EntityManager em) {
@@ -113,24 +130,14 @@ public class AdminMetricsRepository {
     }
 
     public long countListings(String status) {
-        String sql = "select count(*) from properties where archived = false"
-                + (status == null ? "" : " and status = :status");
-        Query query = em.createNativeQuery(sql);
-        if (status != null) {
-            query.setParameter("status", status);
-        }
+        Query query = em.createNativeQuery(COUNT_LISTINGS).setParameter("status", status);
         return ((Number) query.getSingleResult()).longValue();
     }
 
     public long countUsers(Integer withinDays) {
-        String sql = "select count(*) from users where archived = false"
-                + (withinDays == null ? ""
-                        : " and (joined_at at time zone '" + IST + "') >= "
-                                + "(now() at time zone '" + IST + "') - make_interval(days => :d)");
-        Query query = em.createNativeQuery(sql);
-        if (withinDays != null) {
-            query.setParameter("d", withinDays);
-        }
+        Query query = em.createNativeQuery(COUNT_USERS)
+                .setParameter("d", withinDays)
+                .setParameter("tz", PlatformTime.IST.getId());
         return ((Number) query.getSingleResult()).longValue();
     }
 
@@ -170,6 +177,7 @@ public class AdminMetricsRepository {
         Object[] row = (Object[]) em.createNativeQuery(MONEY_TOTALS)
                 .setParameter("from", from)
                 .setParameter("to", to)
+                .setParameter("tz", PlatformTime.IST.getId())
                 .getSingleResult();
         return new AdminFinance.Money(longAt(row, 0), longAt(row, 1), longAt(row, 2), longAt(row, 3),
                 longAt(row, 4));
@@ -180,6 +188,7 @@ public class AdminMetricsRepository {
         return em.createNativeQuery(FEE_SERIES)
                 .setParameter("from", from)
                 .setParameter("to", to)
+                .setParameter("tz", PlatformTime.IST.getId())
                 .getResultList();
     }
 
@@ -204,23 +213,22 @@ public class AdminMetricsRepository {
 
     @SuppressWarnings("unchecked")
     public List<Object[]> ledger(String kind, String q, LocalDate since, int limit, long offset) {
-        return em.createNativeQuery(LEDGER_PROJECTION + "(" + LEDGER_ROWS + ") ledger"
-                + LEDGER_FILTER
-                + " order by occurred_on desc nulls last, number desc, id limit :limit offset :offset")
+        return em.createNativeQuery(LEDGER)
                 .setParameter("kind", kind)
                 .setParameter("q", q)
                 .setParameter("since", since)
                 .setParameter("limit", limit)
                 .setParameter("offset", offset)
+                .setParameter("tz", PlatformTime.IST.getId())
                 .getResultList();
     }
 
     public long ledgerCount(String kind, String q, LocalDate since) {
-        return ((Number) em.createNativeQuery(
-                "select count(*) from (" + LEDGER_ROWS + ") ledger" + LEDGER_FILTER)
+        return ((Number) em.createNativeQuery(LEDGER_COUNT)
                 .setParameter("kind", kind)
                 .setParameter("q", q)
                 .setParameter("since", since)
+                .setParameter("tz", PlatformTime.IST.getId())
                 .getSingleResult()).longValue();
     }
     }

@@ -24,8 +24,8 @@ import org.springframework.web.client.HttpClientErrorException;
 
 public interface PaymentGateway {
     String CREATE_ORDER = "create-order";
-    String TERMINATE = "terminate-order";
-    String REFUND = "refund";
+    String TERMINATE_ORDER = "terminate-order";
+    String REFUND_ORDER = "refund";
     String WEBHOOK = "webhook";
 
     default PaymentOrder createOrder(long amountInr, String reference) {
@@ -93,7 +93,7 @@ class MockPaymentGateway implements PaymentGateway {
 
     @Override
     public String refund(String orderId, long amountInr, String refundId, String note) {
-        calls.record(ProviderCalls.CASHFREE, REFUND, ProviderCalls.Outcome.SKIPPED, null, orderId, "mock", null);
+        calls.record(ProviderCalls.CASHFREE, REFUND_ORDER, ProviderCalls.Outcome.SKIPPED, null, orderId, "mock", null);
         return "mock_refund_" + refundId;
     }
 
@@ -133,7 +133,7 @@ class CashfreePaymentGateway implements PaymentGateway {
 
     private static String httpsOrBlank(String base) {
         String trimmed = base == null ? "" : base.trim();
-        return trimmed.regionMatches(true, 0, "https://", 0, 8) ? trimmed.replaceAll("/+$", "") : "";
+        return trimmed.regionMatches(true, 0, "https://", 0, 8) ? trimmed.replaceAll("([^/]|^)/++$", "$1") : "";
     }
 
     private static String requireHttpsOrBlank(String configured) {
@@ -196,7 +196,7 @@ class CashfreePaymentGateway implements PaymentGateway {
 
     @Override
     public void terminate(String orderId) {
-        calls.track(ProviderCalls.CASHFREE, TERMINATE, null, orderId, () -> {
+        calls.track(ProviderCalls.CASHFREE, TERMINATE_ORDER, null, orderId, () -> {
             cashfree.patch("/pg/orders/" + orderId, API_VERSION, Map.of("order_status", "TERMINATED"),
                     OrderResponse.class);
         });
@@ -235,7 +235,7 @@ class CashfreePaymentGateway implements PaymentGateway {
     @Override
     public String refund(String orderId, long amountInr, String refundId, String note) {
         String text = note == null || note.isBlank() ? "Refund" : note.strip();
-        return calls.track(ProviderCalls.CASHFREE, REFUND, null, orderId, () -> {
+        return calls.track(ProviderCalls.CASHFREE, REFUND_ORDER, null, orderId, () -> {
             RefundResponse response = cashfree.post("/pg/orders/" + orderId + "/refunds", API_VERSION,
                     Map.of("refund_amount", amountInr, "refund_id", refundId,
                             "refund_note", text.length() > 100 ? text.substring(0, 100) : text),

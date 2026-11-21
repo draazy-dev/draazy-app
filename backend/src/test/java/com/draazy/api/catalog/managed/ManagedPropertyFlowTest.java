@@ -43,7 +43,7 @@ class ManagedPropertyFlowTest extends AbstractApiTest {
                         .content(body))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
+        return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*", "$1");
     }
 
     private static String flat(String locality, long price) {
@@ -364,7 +364,7 @@ class ManagedPropertyFlowTest extends AbstractApiTest {
                                 + listingImages(owner) + "}"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
+        return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*", "$1");
     }
 
     @Test
