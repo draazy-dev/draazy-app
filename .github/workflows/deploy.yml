@@ -211,7 +211,8 @@ jobs:
           URL: ${{ steps.deploy.outputs.url }}
         run: |
           set -euo pipefail
-          for attempt in $(seq 1 12); do
+          # A newly created app's ondigitalocean.app host answers 404 at the edge for a few minutes after it is ACTIVE.
+          for attempt in $(seq 1 72); do
             curl -fsS --max-time 15 "$URL/api/actuator/health" && exit 0
             sleep 5
           done
