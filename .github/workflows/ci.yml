@@ -34,7 +34,7 @@ jobs:
           VERSION: 8.30.1
           SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
         run: |
-          curl -sSfL --proto '=https' --tlsv1.2 -o /tmp/gitleaks.tgz \
+          curl -sSfL --proto '=https' --proto-redir '=https' --tlsv1.2 -o /tmp/gitleaks.tgz \
             "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
           echo "${SHA256}  /tmp/gitleaks.tgz" | sha256sum -c -
           tar -xzf /tmp/gitleaks.tgz -C /tmp gitleaks
@@ -69,7 +69,7 @@ jobs:
       # lockfile disagree, which is the check we want in CI.
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       # Split rather than `npm run check` so the failing gate is visible without opening logs.
       - name: Lint
@@ -83,6 +83,18 @@ jobs:
       - name: Help content check
         working-directory: frontend
         run: npm run check:help
+
+      - name: Unit tests with coverage
+        working-directory: frontend
+        run: npm run test:unit -- --coverage
+
+      - name: Upload frontend coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/lcov.info
+          retention-days: 7
 
       - name: Build
         working-directory: frontend
@@ -110,7 +122,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       # A production build, not the dev server: unminified modules over hundreds of
       # requests would produce numbers that describe a machine no user has.
@@ -207,9 +219,9 @@ jobs:
     name: SonarQube Cloud
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: backend
+    needs: [backend, checks]
     # Never `pull_request_target` (exposes SONAR_TOKEN to forks). Skipped on fork PRs and while
-    # private (not on the free plan); `always()` so a red backend suite is still analysed.
+    # private (not on the free plan); `always()` so a red test suite is still analysed.
     if: >-
       always() && !cancelled() &&
       !github.event.repository.private &&
@@ -256,6 +268,14 @@ jobs:
         with:
           name: backend-test-reports
           path: backend/target-cli/
+
+      # The path matches sonar.javascript.lcov.reportPaths.
+      - name: Download frontend coverage
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
 
       # Configuration lives in sonar-project.properties at the repo root; this action reads it.
       # SONAR_TOKEN is a repository secret - rotate it in the SonarQube Cloud UI if ever leaked.
