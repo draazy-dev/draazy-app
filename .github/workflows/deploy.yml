@@ -181,7 +181,7 @@ jobs:
 
       - uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f # v2.5.2
         with:
-          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          token: ${{ secrets.SANDBOX_DIGITALOCEAN_ACCESS_TOKEN }}
 
       - id: deploy
         name: Create or update the app

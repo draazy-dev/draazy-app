@@ -195,7 +195,7 @@ jobs:
 
       - uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f # v2.5.2
         with:
-          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          token: ${{ secrets.PROD_DIGITALOCEAN_ACCESS_TOKEN }}
 
       # The cluster's trusted sources hold only the app, so the runner is let in for the dump and removed after.
       - id: backup
@@ -220,7 +220,8 @@ jobs:
           echo "ip=$ip" >> "$GITHUB_OUTPUT"
           doctl databases firewalls append "$cluster" --rule "ip_addr:$ip" > /dev/null
           conn=$(doctl databases connection "$cluster" --output json)
-          export PGPASSWORD=$(jq -r '.password' <<<"$conn")
+          export PGPASSWORD=$(jq -r '.password // empty' <<<"$conn")
+          [ -n "$PGPASSWORD" ] || { echo "::error::PROD_DIGITALOCEAN_ACCESS_TOKEN lacks database:view_credentials." >&2; exit 1; }
           echo "::add-mask::${PGPASSWORD}"
           dump="$RUNNER_TEMP/predeploy.dump"
           for attempt in $(seq 1 6); do

@@ -9,7 +9,9 @@ BEGIN
 END
 $$;
 
-ALTER ROLE draazy_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+-- doadmin is not a superuser, so it cannot set SUPERUSER/REPLICATION/BYPASSRLS; new roles default to off and the
+-- verify query below checks them.
+ALTER ROLE draazy_app NOCREATEDB NOCREATEROLE;
 
 -- Cuts off a runaway query or a leaked open transaction instead of letting it hold locks.
 ALTER ROLE draazy_app SET statement_timeout = '60s';
