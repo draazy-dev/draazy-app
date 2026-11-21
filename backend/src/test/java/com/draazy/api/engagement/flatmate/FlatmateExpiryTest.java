@@ -70,7 +70,7 @@ class FlatmateExpiryTest extends AbstractApiTest {
                         .content(body(author.getName(), locality, "Quiet and tidy.")))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        String id = json.replaceAll(".*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        String id = json.replaceAll("(?m)^.*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
         jdbc.update("update flatmate_seeker_posts set mod_status = 'approved' where id = ?::uuid", id);
         entityManager.clear();
         return id;

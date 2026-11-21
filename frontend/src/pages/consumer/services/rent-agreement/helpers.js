@@ -30,10 +30,10 @@ export const scrollToSection = (id) => document.getElementById(id)?.scrollIntoVi
 export const fmt = (n) => '₹' + Math.round(n || 0).toLocaleString('en-IN');
 export const fmtPaise = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export const digits = (s) => String(s || '').replace(/\D/g, '');
-export const num = (s) => parseInt(digits(s), 10) || 0;
+export const num = (s) => Number.parseInt(digits(s), 10) || 0;
 
 const sortKeys = (v) => (Array.isArray(v) ? v.map(sortKeys)
-  : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortKeys(v[k])])) : v);
+  : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).map((k) => [k, sortKeys(v[k])])) : v);
 export const filingKey = (filing) => JSON.stringify(sortKeys(filing));
 
 export const DETAILS_MAX_CHARS = 16000;

@@ -5,6 +5,7 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.Objects;
 
 public final class Tokens {
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -19,6 +20,7 @@ public final class Tokens {
     }
 
     public static String sha256Hex(String token) {
+        Objects.requireNonNull(token, "token");
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256")
                     .digest(token.getBytes(StandardCharsets.UTF_8));

@@ -15,7 +15,7 @@ import {
 
 const signedIn = () => !!readAccessToken();
 
-const toList = (rows, fn) => (Array.isArray(rows) ? rows : []).map(fn);
+const toList = (rows, fn) => (Array.isArray(rows) ? rows : []).map((row) => fn(row));
 
 const unwrapMapped = (res, fn, requested = 0) => {
   const { items, ...rest } = unwrapPage(res, { page: requested });

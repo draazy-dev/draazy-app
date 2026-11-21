@@ -169,7 +169,7 @@ export default function Societies() {
       toast(now ? t('societies.followToast') : t('societies.unfollowToast'), now ? 'success' : 'info');
     };
     if (!isIn) { sendToSignIn('society', undefined, follow); return; }
-    follow();
+    void follow();
   };
 
   const addSociety = async (picked) => {

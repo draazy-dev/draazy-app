@@ -120,7 +120,7 @@ export default function PartyIdentities({ requestId, state, editable = false, cl
 
   const saved = () => {
     setCorrecting('');
-    reveal();
+    void reveal();
   };
 
   const rows = status === 'ready' ? (editable && state ? merged(state, identities) : identities) : [];

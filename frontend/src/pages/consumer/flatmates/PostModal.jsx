@@ -30,7 +30,7 @@ export default function PostModal({ setPostOpen, submitPost, takeDownPost, postF
   const panelRef = useModalDialog(true, () => setPostOpen(false));
   const title = tr(editingId ? 'flatmates.editModalTitle' : 'flatmates.postModalTitle');
   return (
-    <div className="sf-modal" onClick={() => setPostOpen(false)}>
+    <div className="sf-modal" role="presentation" onClick={() => setPostOpen(false)}>
       <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} className="dz-modal-panel border border-white/10 rounded-3xl w-full max-w-xl p-6 sm:p-7 outline-none" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between mb-5">
           <div>

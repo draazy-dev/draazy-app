@@ -61,11 +61,11 @@ export default function useProperty() {
     let alive = true;
     setP(undefined);
     setActive(0);
-    getProperty(id, { maxAge: REVISIT_MAX_AGE }).then((r) => {
+    void getProperty(id, { maxAge: REVISIT_MAX_AGE }).then((r) => {
       if (!alive) return;
       setP(r ?? null);
       if (r) {
-        recordSignal({ kind: 'view', localitySlug: r.localitySlug, propertyId: r.uuid });
+        void recordSignal({ kind: 'view', localitySlug: r.localitySlug, propertyId: r.uuid });
         pushRecentProp(r.id);
         track('view_listing', { id: r.id, locality: r.locality, deal: r.deal });
       }
@@ -76,7 +76,7 @@ export default function useProperty() {
   useEffect(() => {
     if (freshAuthIdentity.current === authIdentity) return undefined;
     let alive = true;
-    getProperty(id).then((r) => {
+    void getProperty(id).then((r) => {
       if (!alive) return;
       freshAuthIdentity.current = authIdentity;
       setP(r ?? null);

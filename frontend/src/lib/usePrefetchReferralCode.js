@@ -4,5 +4,5 @@ import { myReferralCode } from './referralShare.js';
 
 export function usePrefetchReferralCode() {
   const { isIn } = useAuth();
-  useEffect(() => { if (isIn) myReferralCode(); }, [isIn]);
+  useEffect(() => { if (isIn) void myReferralCode(); }, [isIn]);
 }

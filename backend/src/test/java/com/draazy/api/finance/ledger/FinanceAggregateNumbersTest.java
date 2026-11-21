@@ -67,7 +67,7 @@ class FinanceAggregateNumbersTest extends AbstractApiTest {
                 .andExpect(status().isCreated())
                 .andReturn();
         return result.getResponse().getContentAsString()
-                .replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
+                .replaceAll("^.*?\"id\":\"([^\"]+)\".*", "$1");
     }
 
     private void seed(User owner, Property p) throws Exception {

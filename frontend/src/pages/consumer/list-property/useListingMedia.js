@@ -145,7 +145,7 @@ export default function useListingMedia({ setErrors }) {
       probe.src = url;
     });
     const missing = async (urls) => (await Promise.all(urls.map(loads))).flatMap((ok, i) => (ok ? [] : [urls[i]]));
-    (async () => {
+    void (async () => {
       let gone = await missing(saved.map(({ url }) => url));
       if (gone.length) {
         await new Promise((resolve) => { setTimeout(resolve, 2000); });

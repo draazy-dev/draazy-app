@@ -23,7 +23,7 @@ export default function GroupModal({ setGroupOpen, submitGroup, grpFormRef, grpD
   const policyField = <div><span className={lbl}>{tr('flatmates.openTo')}</span><ChoiceRow label={tr('flatmates.openTo')} options={[['women', tr('flatmates.optWomenOnly')], ['men', tr('flatmates.optMenOnly')], ['any', tr('flatmates.optAnyone')]]} value={grp.policy} onChange={(v) => setGrp({ ...grp, policy: v })} /></div>;
   const seatsField = <div><label htmlFor="grp-seats" className={lbl}>{tr('flatmates.peopleSharing')}</label><input id="grp-seats" type="number" inputMode="numeric" min="1" max={MAX_GROUP_SEATS} value={grp.seats} onChange={(e) => setGrp({ ...grp, seats: e.target.value })} className="field w-full rounded-xl px-3.5 py-2.5 text-sm" /></div>;
   return (
-    <div className="sf-modal" onClick={() => setGroupOpen(false)}>
+    <div className="sf-modal" role="presentation" onClick={() => setGroupOpen(false)}>
       <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} className="dz-modal-panel border border-white/10 rounded-3xl w-full max-w-xl p-6 sm:p-7 outline-none" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between mb-5">
           <div><h2 className="text-xl font-bold text-white">{title}</h2>{!editing && <p className="text-gray-400 text-xs mt-1">{tr('flatmates.groupModalSubtitle')}</p>}</div>

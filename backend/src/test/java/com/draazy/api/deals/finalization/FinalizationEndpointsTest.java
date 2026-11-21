@@ -66,7 +66,7 @@ class FinalizationEndpointsTest extends AbstractApiTest {
 
     private String extractId(MvcResult result) throws Exception {
         String json = result.getResponse().getContentAsString();
-        return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
+        return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*", "$1");
     }
 
     @Test
@@ -448,11 +448,11 @@ class FinalizationEndpointsTest extends AbstractApiTest {
     }
 
     private static String messageOf(String json) {
-        return json.replaceAll("^.*\"message\":\"([^\"]*)\".*$", "$1");
+        return json.replaceAll("^.*\"message\":\"([^\"]*)\".*", "$1");
     }
 
     private static String errorOf(String json) {
-        return json.replaceAll("^.*\"error\":\"([^\"]*)\".*$", "$1");
+        return json.replaceAll("^.*\"error\":\"([^\"]*)\".*", "$1");
     }
 
     @Test

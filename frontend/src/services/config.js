@@ -51,4 +51,4 @@ const registry = import.meta.glob('./providers/http/*Provider.js');
 const KNOWN_DOMAINS = Object.keys(registry)
   .map((path) => path.match(/\/([^/]+)Provider\.js$/)?.[1])
   .filter(Boolean)
-  .sort();
+  .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));

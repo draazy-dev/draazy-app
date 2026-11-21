@@ -8,7 +8,7 @@ export const isPubliclyVisible = (modStatus) => MOD_PUBLIC.includes(modStatus ||
 export const CONFLICT_ALREADY_INTERESTED = 'already_interested';
 export const CONFLICT_GROUP_FULL = 'group_full';
 
-export const CONFLICT_MARKER = /\s*\(([a-z_]+)\)\s*$/;
+export const CONFLICT_MARKER = /(?<!\s)\s*\(([a-z_]+)\)\s*$/;
 
 export function conflictSubCode(err) {
   if (err?.status !== 409) return null;

@@ -1,5 +1,5 @@
 
-const amount = (s) => parseInt(String(s == null ? '' : s).replace(/[^\d]/g, ''), 10) || 0;
+const amount = (s) => Number.parseInt(String(s == null ? '' : s).replace(/[^\d]/g, ''), 10) || 0;
 
 export const TIER_A_FIELDS = [
   { key: 'deal', label: 'Listing type (Sale / Rent)' },
@@ -112,7 +112,7 @@ export const MATERIAL_EDIT_WINDOW_DAYS = 30;
 export const MATERIAL_EDIT_CAP = 3;
 
 const norm = (v) => {
-  if (Array.isArray(v)) return v.map((x) => String(x)).sort().join('|');
+  if (Array.isArray(v)) return v.map((x) => String(x)).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join('|');
   if (v == null) return '';
   return String(v).trim();
 };

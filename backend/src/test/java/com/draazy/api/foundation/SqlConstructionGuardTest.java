@@ -29,7 +29,7 @@ class SqlConstructionGuardTest {
     private static final Pattern NON_CODE = Pattern.compile(
             "\"\"\"[\\s\\S]*?\"\"\"|\"(?:\\\\.|[^\"\\\\])*\"|//[^\\n]*|/\\*[\\s\\S]*?\\*/");
 
-    private static final Pattern CONSTANTS_ONLY = Pattern.compile("[\\s+]*(?:(?:\\w+\\.)?[A-Z][A-Z0-9_]*[\\s+]*)*");
+    private static final Pattern CONSTANTS_ONLY = Pattern.compile("[\\s+]*+(?:(?>\\w++(?:\\.[A-Z]\\w++(?=\\.))*+\\.[A-Z][A-Z0-9_]*+|[A-Z][A-Z0-9_]*+)[\\s+]*+)*+");
 
     private static final Pattern WILDCARD_CONCAT = Pattern.compile("\"%\"\\s*\\+|\\+\\s*\"%\"|concat\\('%'");
 
@@ -37,10 +37,8 @@ class SqlConstructionGuardTest {
 
     private static final Map<String, String> REVIEWED_DYNAMIC_SQL = Map.ofEntries(
             Map.entry("admin/AdminFlatmateAnalyticsService.java", "window() callers pass EVENTS/REPLIES/WEEKLY_REPLIES constants"),
-            Map.entry("admin/AdminHelpFeedbackService.java", "optional ' AND slug = ?' literal"),
-            Map.entry("admin/AdminIntegrationsService.java", "WHERE clause of fixed ' AND col = ?' literals"),
-            Map.entry("admin/AdminMetricsRepository.java", "filters are literals; IST is a constant"),
-            Map.entry("admin/AdminSlaService.java", "TRACK formatted with *_COMPLETED/*_OUTSTANDING constants"),
+            Map.entry("admin/AdminMetricsRepository.java", "count() callers pass COUNT_* constants"),
+            Map.entry("admin/AdminSlaService.java", "track() callers pass the constant *_TRACK queries"),
             Map.entry("admin/alerts/StaffSlaSweep.java", "runs StaffSlaRule.CATALOGUE text blocks; stage durations are enum constants"),
             Map.entry("admin/leads/LeadSources.java", "runs the FEEDS text-block constants; no caller input"),
             Map.entry("admin/staff/TeamPerformanceRepository.java", "team names come from DESK_TEAMS, not the caller"),
@@ -50,10 +48,9 @@ class SqlConstructionGuardTest {
             Map.entry("common/persistence/RateLimitLock.java", "both callers pass a literal"),
             Map.entry("engagement/flatmate/FlatmateSearchQueries.java", "sort and score fragments are literals"),
             Map.entry("engagement/search/SavedSearchMatcher.java", "stored criteria are bound, never inlined"),
-            Map.entry("moderation/errorlog/ErrorLogRepository.java", "optional ' AND col = ?' literals; values are bound"),
-            Map.entry("identity/user/export/DataExportService.java", "DataExportScope constants plus an int limit"),
             Map.entry("moderation/enquiry/EnquiryBoardQueries.java", "entity names are literals at every call site"),
-            Map.entry("moderation/property/PendingQueue.java", "ROWS formatted with literal asc/desc"),
+            Map.entry("identity/user/export/DataExportService.java", "DataExportScope constants plus an int limit"),
+            Map.entry("moderation/property/PendingQueue.java", "ROWS_OLDEST_FIRST or ROWS_NEWEST_FIRST, both constants"),
             Map.entry("moderation/verification/NeedsInfoReviewRepository.java", "every caller passes a text block"),
             Map.entry("services/support/StaffSupportChatService.java", "update() callers pass literals"),
             Map.entry("services/support/SupportChatDeskLinks.java", "OWNER constant picked by a checked type"),

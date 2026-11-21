@@ -12,7 +12,7 @@ export function computeStampDuty(value, ratePct) {
 export const rentForTerm = (rent, months, incrementPct, every) => {
   const pct = Number(incrementPct);
   const bps = Number.isFinite(pct) && pct >= 0 && pct <= 100 ? Math.round(pct * 100) : 0;
-  const step = parseInt(every, 10) === 12 ? 12 : 11;
+  const step = Number.parseInt(every, 10) === 12 ? 12 : 11;
   let monthly = rent, total = 0;
   for (let paid = 0; paid < months; paid += step) {
     if (paid > 0) monthly = Math.floor(Math.floor((monthly * (10000 + bps) + 50) / 100) / 100);

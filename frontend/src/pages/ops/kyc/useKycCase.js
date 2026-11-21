@@ -95,7 +95,7 @@ export default function useKycCase(openId, { canWrite, userId, onChanged }) {
     setError('');
     setClaimNotice('');
 
-    (async () => {
+    void (async () => {
       try {
         const initial = await getIdentityReview(openId);
         if (!isCurrent()) return;

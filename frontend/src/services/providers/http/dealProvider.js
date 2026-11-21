@@ -11,7 +11,7 @@ import {
 
 const signedIn = () => !!readAccessToken();
 
-const toList = (rows, fn) => (Array.isArray(rows) ? rows : []).map(fn);
+const toList = (rows, fn) => (Array.isArray(rows) ? rows : []).map((row) => fn(row));
 
 const paged = (propertyId) => ({ propertyId: propertyId || undefined, size: MAX_PAGE_SIZE });
 

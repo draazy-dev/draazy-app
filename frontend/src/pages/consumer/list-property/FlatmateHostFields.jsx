@@ -11,7 +11,7 @@ import { useGroupPickers } from '../flatmates/useGroupPickers.js';
 import { fld, lbl } from './styles.js';
 
 const bhkOf = (raw) => {
-  const n = Math.min(4, parseInt(raw, 10));
+  const n = Math.min(4, Number.parseInt(raw, 10));
   return n > 0 ? String(n) : '';
 };
 

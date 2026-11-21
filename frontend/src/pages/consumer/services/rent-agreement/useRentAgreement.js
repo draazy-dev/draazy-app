@@ -319,7 +319,7 @@ export function useRentAgreement() {
     const coFilled = role && (continuable.parties || []).some((p) => p?.role === role && p.status === 'accepted') ? role : null;
     setCoFilledRole(coFilled);
     setMaskedIds({});
-    loadMaskedIds(continuable.id, continuable.details._state);
+    void loadMaskedIds(continuable.id, continuable.details._state);
     restoreFiledDocs(continuable);
     if (invitedRole(continuable.details._state)) {
       topUpRef.current = continuable;
@@ -340,7 +340,7 @@ export function useRentAgreement() {
     applyFormState(r.details._state);
     setCoFilledRole(invitedRole(r.details._state));
     setMaskedIds({});
-    loadMaskedIds(r.id, r.details._state);
+    void loadMaskedIds(r.id, r.details._state);
     setOwnerDocs({});
     setTenantDocs({});
     restoreFiledDocs(r);
@@ -510,7 +510,7 @@ export function useRentAgreement() {
   useEffect(() => {
     if (!vaultEnabled) return;
     let cancelled = false;
-    (async () => {
+    void (async () => {
       const vault = await listDocuments(user.mobile, vaultPropertyId, REVISIT_READ).catch(() => null);
       if (cancelled || !vault) return;
       const held = new Set(vault.map((d) => String(d.id)));
@@ -566,7 +566,7 @@ export function useRentAgreement() {
 
   const cost = useMemo(() => {
     const rent = num(terms.rent), dep = num(terms.deposit), nr = num(terms.nrDeposit);
-    const months = parseInt(terms.months, 10) || 11;
+    const months = Number.parseInt(terms.months, 10) || 11;
     const answers = { rent, dep, months, status: feeStatus, retry: retryFees };
     if (feeStatus !== 'ready' || !feeRow) {
       return { ...answers, stamp: null, exactPaise: null, reg: null, dhc: null, service: null, total: null, computed: [], notes: null };
@@ -646,7 +646,7 @@ export function useRentAgreement() {
     }
     setInviteError((e) => (e?.kind === 'signin' ? null : e));
     let alive = true;
-    (async () => {
+    void (async () => {
       try {
         const invites = await listMyServiceRequestInvites();
         if (!alive) return;
@@ -702,7 +702,7 @@ export function useRentAgreement() {
         setMode('invite');
         if (req.details && req.details._state) applyFormState(req.details._state);
         restoreFiledDocs(req);
-        loadMaskedIds(reqId);
+        void loadMaskedIds(reqId);
         const kyc = readSavedKyc(user.mobile) || {};
         if (role === 'tenant') {
           setTenants((arr) => arr.map((item, idx) => (idx === partyIndex
@@ -780,7 +780,7 @@ export function useRentAgreement() {
     if (!l) return;
     // eslint-disable-next-line
     listingAppliedRef.current = listingId;
-    applyListing(l, { overwrite: false }).then((applied) => {
+    void applyListing(l, { overwrite: false }).then((applied) => {
       if (applied && reissue) toast(tr('services.ra.reissueHint'));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- consume listing URL once without overwriting edits
@@ -792,7 +792,7 @@ export function useRentAgreement() {
   useEffect(() => {
     if (!renewId || mode === 'invite' || !isIn || renewAppliedRef.current === renewId) return;
     renewAppliedRef.current = renewId;
-    (renewHomeId ? rentAgreementHomeRenewal(renewHomeId) : rentAgreementRenewal(renewId)).catch(() => null).then((res) => {
+    void (renewHomeId ? rentAgreementHomeRenewal(renewHomeId) : rentAgreementRenewal(renewId)).catch(() => null).then((res) => {
       if (!mountedRef.current) return;
       if (res) {
         if (Object.keys(res.prop).length) setProp((cur) => fillBlanks(cur, res.prop));

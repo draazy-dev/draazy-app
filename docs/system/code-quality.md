@@ -109,15 +109,18 @@ change.
   three pre-existing architecture guards (`ServiceSizeGuardTest`, `SpecCoverageTest`,
   `ErasureCoverageTest`), not regressions from adding CI.
 - **Java coverage** comes from JaCoCo, which the CI `backend` job runs from the command line (it is
-  not in `pom.xml`). The `sonar` job imports it along with the surefire results. There is **no JS
-  coverage**: `frontend/package.json` has no unit runner, and Playwright e2e does not produce lcov.
+  not in `pom.xml`). The `sonar` job imports it along with the surefire results. **JS coverage**
+  comes from Vitest (`npm run test:unit -- --coverage`, tests in `frontend/test/unit`), run by the CI
+  `checks` job and handed to `sonar` as lcov. JSX screens are excluded from coverage
+  (`sonar.coverage.exclusions`) because the Playwright e2e suite covers them and produces no lcov.
 - **No Checkmarx and no CodeQL.** Deferred past functional close (decision 41).
 - Backend static analysis: Checkstyle was replaced by Spotless (D36), and **Spotless is currently
   excluded** (D68). So there is still no active backend *formatting* gate.
 - Frontend lint is green on errors but carries **~395 warnings**.
 
-So this is no longer "nothing scans": scanning is standing up, findings are untriaged, and the work
-below is the triage.
+So this is no longer "nothing scans". The 2026-11-20 export (472 issues) has been triaged: what
+remains open is either accepted (risk reviewed, e.g. `java:S9352`, the reviewed `java:S2077`
+builder fragments in `REVIEWED_DYNAMIC_SQL`) or a false positive, each to be marked in SonarCloud.
 
 ### Ponytail-ordered plan
 
@@ -172,7 +175,7 @@ mega-commit is unreviewable and conflicts with everything in flight.
 - [ ] ESLint warnings driven down / ratcheted before any scanner is added.
 - [x] **Backend `mvnw test` added to CI.** Baseline 2266 run / 3 failures — the job is a real gate,
       so it is red until those three guards are resolved.
-- [x] Sonar (SonarQube Cloud) wired; **findings not yet triaged by severity**.
+- [x] Sonar (SonarQube Cloud) wired; the 2026-11-20 findings triaged and fixed or accepted.
 - [ ] Quality gate set to Clean as You Code in the UI, and **not** marked a required check.
 - [ ] Checkmarx-vs-CodeQL decision recorded in `open-questions.md`; the chosen SAST wired.
 - [ ] Security findings on auth / contact gate / storage fixed before anything cosmetic.

@@ -19,7 +19,7 @@ import org.springframework.util.ReflectionUtils;
 final class JobRunScheduler implements TaskScheduler {
     static final String TRACE_PREFIX = "job-";
 
-    private static final Pattern QUALIFIED_METHOD = Pattern.compile("[\\w$]+(?:\\.[\\w$]+)+");
+    private static final Pattern QUALIFIED_METHOD = Pattern.compile("[\\w$]++(?:\\.[\\w$]++)++");
 
     private static final Logger log = LoggerFactory.getLogger(JobRunScheduler.class);
 

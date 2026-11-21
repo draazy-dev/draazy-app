@@ -60,7 +60,7 @@ class FlatmateStaleWriteTest extends AbstractCommittedApiTest {
     }
 
     private static String idIn(String json) {
-        return json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        return json.replaceAll("(?m)^.*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
     private String created(RequestBuilder request) throws Exception {

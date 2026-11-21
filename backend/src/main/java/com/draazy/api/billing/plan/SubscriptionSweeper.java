@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -110,7 +111,7 @@ public class SubscriptionSweeper implements AbandonedCheckouts {
             }
             return count;
         });
-        return ended == null ? 0 : ended;
+        return Optional.ofNullable(ended).orElse(0);
     }
 
     public int sendDueRefunds() {
@@ -128,7 +129,7 @@ public class SubscriptionSweeper implements AbandonedCheckouts {
 
     private void pauseBeyondAllowance(UUID ownerId, Instant now) {
         List<UUID> beyond = transactions.execute(status -> quota.liveBeyondAllowance(ownerId, now));
-        for (UUID id : beyond == null ? List.<UUID>of() : beyond) {
+        for (UUID id : Optional.ofNullable(beyond).orElseGet(List::of)) {
             transactions.executeWithoutResult(status -> properties.findForVerificationDecision(id)
                     .filter(p -> !p.isArchived() && PropertyStatus.APPROVED.equals(p.getStatus())
                             && quota.liveBeyondAllowance(ownerId, now).contains(id))

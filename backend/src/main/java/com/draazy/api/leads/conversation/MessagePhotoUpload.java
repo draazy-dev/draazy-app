@@ -10,8 +10,10 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.UncheckedIOException;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
@@ -115,5 +117,22 @@ final class MessagePhotoUpload {
     }
 
     record Processed(byte[] bytes, String contentType, String fileName, String storageKey) {
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof Processed that && Arrays.equals(bytes, that.bytes)
+                    && Objects.equals(contentType, that.contentType) && Objects.equals(fileName, that.fileName)
+                    && Objects.equals(storageKey, that.storageKey);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Objects.hash(contentType, fileName, storageKey) + Arrays.hashCode(bytes);
+        }
+
+        @Override
+        public String toString() {
+            return "Processed[bytes=" + bytes.length + ", contentType=" + contentType + ", fileName=" + fileName
+                    + ", storageKey=" + storageKey + "]";
+        }
     }
 }

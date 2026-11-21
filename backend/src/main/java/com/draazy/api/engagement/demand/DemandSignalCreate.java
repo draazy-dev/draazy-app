@@ -11,7 +11,7 @@ public record DemandSignalCreate(
         String kind,
 
         @Size(max = 120)
-        @Pattern(regexp = "\\s*|[a-z0-9]+(?:-[a-z0-9]+)*", message = "localitySlug must be a locality slug")
+        @Pattern(regexp = "\\s*|[a-z0-9]++(?:-[a-z0-9]++)*+", message = "localitySlug must be a locality slug")
         String localitySlug,
 
         @Pattern(regexp = "buy|rent", message = "deal must be buy or rent")

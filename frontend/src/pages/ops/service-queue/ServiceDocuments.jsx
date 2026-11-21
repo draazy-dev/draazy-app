@@ -17,7 +17,7 @@ export default function ServiceDocuments({
               type="button"
               className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-sky-200 hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300"
               onClick={() => {
-                openRequestDoc(requestId, document.id).then((opened) => { if (!opened) onUnavailable(); });
+                void openRequestDoc(requestId, document.id).then((opened) => { if (!opened) onUnavailable(); });
               }}
             >
               <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />

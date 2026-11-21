@@ -93,7 +93,7 @@ export default function AdminPostOnBehalf() {
       if (form.propertyType === 'commercial' && !form.shellType) err.shellType = true;
       if (!form.bhk && !NONRES_TYPES.includes(form.propertyType)) err.bhk = true;
       if (!form.carpetArea) err.carpetArea = true;
-      if (form.floor && form.totalFloors && (parseInt(form.floor, 10) || 0) > Number(form.totalFloors)) err.floor = true;
+      if (form.floor && form.totalFloors && (Number.parseInt(form.floor, 10) || 0) > Number(form.totalFloors)) err.floor = true;
       if (LAND_TYPES.includes(form.propertyType)) {
         if (!form.naStatus) err.naStatus = true;
         if (!form.otherRights) err.otherRights = true;
@@ -135,7 +135,7 @@ export default function AdminPostOnBehalf() {
         locality: form.locality || 'Pune',
         localitySlug: form.localitySlug || undefined,
         area: Number(form.carpetArea) || 0,
-        floor: land || !form.floor ? undefined : parseInt(form.floor, 10) || 0,
+        floor: land || !form.floor ? undefined : Number.parseInt(form.floor, 10) || 0,
         totalFloors: land ? undefined : form.totalFloors,
         furnishing: residentialHome ? form.furnishing : undefined,
         price: parseAmount(form.price),

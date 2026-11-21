@@ -244,6 +244,12 @@ class ServiceRequestFlowTest extends ServiceFixtures {
             openDraft(buyer, id, 204);
             decide(buyer, id, "approve", 200);
             finalDoc(desk, id, 201);
+
+            mvc.perform(get(Routes.ServiceRequests.BY_ID, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(desk)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.assignee").value("Rohit Desk"))
+                    .andExpect(jsonPath("$.status").value("completed"));
         }
 
         @Test
@@ -317,6 +323,7 @@ class ServiceRequestFlowTest extends ServiceFixtures {
             String id = raise(buyer, "rent-agreement", listing(buyer));
 
             setStatus(desk, id, "registration", 400);
+            expectStatus(buyer, id, "new");
         }
 
         @Test

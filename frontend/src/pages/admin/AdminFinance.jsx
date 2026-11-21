@@ -122,7 +122,7 @@ export default function AdminFinance() {
 
   useEffect(() => {
     let alive = true;
-    Promise.allSettled([getFinanceOverview(), getFinanceSeries(MAX_MONTHS)]).then(([f, sr]) => {
+    void Promise.allSettled([getFinanceOverview(), getFinanceSeries(MAX_MONTHS)]).then(([f, sr]) => {
       if (!alive) return;
       setFinance(f.status === 'fulfilled' ? f.value : null);
       setOverviewFailed(f.status !== 'fulfilled');

@@ -9,7 +9,6 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -21,6 +20,8 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -32,14 +33,28 @@ public class AdminIntegrationsService {
     private static final int MAX_PAGE = 100;
     private static final long MAX_OFFSET = 100_000L;
 
-    private final JdbcTemplate jdbc;
+    private static final String CALL_FILTER = """
+             WHERE (cast(:provider as text) IS NULL OR provider = cast(:provider as text))
+               AND (cast(:outcome as text) IS NULL OR outcome = cast(:outcome as text))
+               AND (cast(:since as timestamptz) IS NULL OR created_at >= cast(:since as timestamptz))
+               AND (cast(:reference as text) IS NULL
+                    OR reference = cast(:reference as text) OR recipient_hash = cast(:hash as text))
+            """;
+
+    private static final String COUNT_CALLS = "SELECT count(*) FROM provider_call" + CALL_FILTER;
+
+    private static final String CALLS = """
+            SELECT id, provider, operation, outcome, recipient, reference, detail, duration_ms, created_at
+            FROM provider_call""" + CALL_FILTER + " ORDER BY created_at DESC, id LIMIT :limit OFFSET :offset";
+
+    private final NamedParameterJdbcTemplate jdbc;
     private final Map<String, Boolean> live;
 
     public AdminIntegrationsService(JdbcTemplate jdbc,
             @Value("${draazy.providers.zeptomail.enabled:false}") boolean emailLive,
             @Value("${draazy.providers.whatsapp.enabled:false}") boolean whatsAppLive,
             @Value("${draazy.providers.cashfree.enabled:false}") boolean cashfreeLive) {
-        this.jdbc = jdbc;
+        this.jdbc = new NamedParameterJdbcTemplate(jdbc);
         this.live = Map.of(ProviderCalls.ZEPTOMAIL, emailLive,
                 ProviderCalls.WHATSAPP, whatsAppLive,
                 ProviderCalls.CASHFREE, cashfreeLive);
@@ -91,41 +106,22 @@ public class AdminIntegrationsService {
         }
 
         Instant since = PlatformTime.sinceOrNull(days);
-        StringBuilder where = new StringBuilder(" WHERE true");
-        List<Object> args = new ArrayList<>();
-        if (provider != null) {
-            where.append(" AND provider = ?");
-            args.add(provider);
-        }
-        if (outcome != null) {
-            where.append(" AND outcome = ?");
-            args.add(outcome);
-        }
-        if (since != null) {
-            where.append(" AND created_at >= ?");
-            args.add(Timestamp.from(since));
-        }
+        MapSqlParameterSource params = new MapSqlParameterSource("provider", provider)
+                .addValue("outcome", outcome)
+                .addValue("since", since == null ? null : Timestamp.from(since));
         if (q != null && !q.isBlank()) {
-            String hash = ProviderCalls.hashRecipient(q);
-            where.append(" AND (reference = ?").append(hash == null ? ")" : " OR recipient_hash = ?)");
-            args.add(q.strip());
-            if (hash != null) {
-                args.add(hash);
-            }
+            params.addValue("reference", q.strip()).addValue("hash", ProviderCalls.hashRecipient(q));
+        } else {
+            params.addValue("reference", null).addValue("hash", null);
         }
 
-        Long total = jdbc.queryForObject("SELECT count(*) FROM provider_call" + where, Long.class, args.toArray());
-        List<Object> pageArgs = new ArrayList<>(args);
-        pageArgs.add(safeSize);
-        pageArgs.add(offset);
-        List<AdminProviderCall> rows = jdbc.query("""
-                SELECT id, provider, operation, outcome, recipient, reference, detail, duration_ms, created_at
-                FROM provider_call""" + where + " ORDER BY created_at DESC, id LIMIT ? OFFSET ?",
+        Long total = jdbc.queryForObject(COUNT_CALLS, params, Long.class);
+        params.addValue("limit", safeSize).addValue("offset", offset);
+        List<AdminProviderCall> rows = jdbc.query(CALLS, params,
                 (rs, n) -> new AdminProviderCall(
                         rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3), rs.getString(4),
                         rs.getString(5), rs.getString(6), rs.getString(7),
-                        rs.getObject(8, Integer.class), instant(rs, 9)),
-                pageArgs.toArray());
+                        rs.getObject(8, Integer.class), instant(rs, 9)));
         return PageResponse.of(
                 new PageImpl<>(rows, PageRequest.of(safePage, safeSize, Sort.by(Sort.Order.desc("createdAt"))),
                         total == null ? 0 : total),

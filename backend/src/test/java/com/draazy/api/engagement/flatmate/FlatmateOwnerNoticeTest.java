@@ -99,7 +99,7 @@ class FlatmateOwnerNoticeTest extends AbstractApiTest {
 
     private String idOf(ResultActions result) throws Exception {
         String json = result.andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
-        return json.replaceAll("(?s).*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        return json.replaceAll("(?s)^.*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
     private void commit() {

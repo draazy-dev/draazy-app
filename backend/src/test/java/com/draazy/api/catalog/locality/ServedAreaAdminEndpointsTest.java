@@ -35,15 +35,15 @@ class ServedAreaAdminEndpointsTest extends AbstractApiTest {
     @Autowired UserRepository users;
 
     @BeforeEach
+    void prepareRows() {
+        clearAudit();
+        jdbc.update("update localities set district_checked_at = now() where district_checked_at is null");
+        jdbc.update("update societies set district_checked_at = now() where district_checked_at is null");
+    }
+
     @AfterEach
     void clearAudit() {
         jdbc.update("delete from audit_log where action = 'servedArea.recheck'");
-    }
-
-    @BeforeEach
-    void onlyTheTestRowsAreUnchecked() {
-        jdbc.update("update localities set district_checked_at = now() where district_checked_at is null");
-        jdbc.update("update societies set district_checked_at = now() where district_checked_at is null");
     }
 
     private String token(String role) {

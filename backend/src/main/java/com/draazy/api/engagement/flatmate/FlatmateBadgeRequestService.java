@@ -139,8 +139,8 @@ public class FlatmateBadgeRequestService {
             doc.put("id", id.toString());
             doc.put("type", type);
             if (period != null) {
-                doc.put(AgreementPeriod.FROM, period.from().toString());
-                doc.put(AgreementPeriod.TILL, period.till().toString());
+                doc.put(AgreementPeriod.FROM_KEY, period.from().toString());
+                doc.put(AgreementPeriod.TILL_KEY, period.till().toString());
             }
             return doc;
         }

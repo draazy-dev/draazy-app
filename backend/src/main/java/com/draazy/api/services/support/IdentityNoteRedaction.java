@@ -5,7 +5,7 @@ import java.util.regex.Pattern;
 
 final class IdentityNoteRedaction {
     private static final List<Pattern> SENSITIVE_NUMBERS = List.of(
-            Pattern.compile("(?i)(?:\\d[\\s-]?){8,}"),
+            Pattern.compile("(?i)(?:\\d[\\s-]?+){8,}+"),
             Pattern.compile("(?i)\\b[a-z]{5}[\\s-]?\\d{4}[\\s-]?[a-z]\\b"),
             Pattern.compile("(?i)\\b[a-z][\\s-]?\\d{7}\\b"),
             Pattern.compile("(?i)\\b[a-z]{3}[\\s-]?\\d{7}\\b"));

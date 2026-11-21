@@ -11,9 +11,9 @@ import java.util.regex.Pattern;
 public record RegistrationParticulars(String documentNo, String sro, String registeredOn, String grn) {
 
     private static final Pattern DOCUMENT_NO = Pattern.compile("[A-Z0-9][A-Z0-9 ./-]{0,38}[A-Z0-9]");
-    private static final Pattern SRO = Pattern.compile("[A-Za-z][A-Za-z0-9 .,()-]{1,59}");
+    private static final Pattern SRO_PATTERN = Pattern.compile("[A-Za-z][A-Za-z0-9 .,()-]{1,59}");
 
-    private static final Pattern GRN = Pattern.compile("MH[0-9A-Z]{8,23}");
+    private static final Pattern GRN_PATTERN = Pattern.compile("MH[0-9A-Z]{8,23}");
 
     public record Valid(String documentNo, String sro, LocalDate registeredOn, String grn) {
     }
@@ -25,7 +25,7 @@ public record RegistrationParticulars(String documentNo, String sro, String regi
             bad.add("document number");
         }
         String office = strip(sro);
-        if (!SRO.matcher(office).matches()) {
+        if (!SRO_PATTERN.matcher(office).matches()) {
             bad.add("Sub-Registrar office");
         }
         LocalDate on = date(registeredOn);
@@ -45,7 +45,7 @@ public record RegistrationParticulars(String documentNo, String sro, String regi
 
     static String normalisedGrn(String value) {
         String challan = upper(value).replace(" ", "");
-        return GRN.matcher(challan).matches() ? challan : null;
+        return GRN_PATTERN.matcher(challan).matches() ? challan : null;
     }
 
     private static String strip(String value) {

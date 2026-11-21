@@ -191,8 +191,8 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
   };
   const loadedTotal = search.loaded ? total : null;
   const tabTotal = (key) => (key === tab ? loadedTotal ?? search.tabTotals?.[key] ?? null : search.tabTotals?.[key] ?? null);
-  const otherTab = TABS.filter((key) => key !== tab)
-    .reduce((best, key) => ((tabTotal(key) ?? 0) > (tabTotal(best) ?? 0) ? key : best));
+  const otherTabs = TABS.filter((key) => key !== tab);
+  const otherTab = otherTabs.reduce((best, key) => ((tabTotal(key) ?? 0) > (tabTotal(best) ?? 0) ? key : best), otherTabs[0]);
   const otherCount = tabTotal(otherTab) ?? 0;
   const switchTab = () => selectTab(otherTab);
 
@@ -247,10 +247,10 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
     if (/\b(girls?|wom[ae]n|females?|ladies)\b/.test(q)) { next.gender = 'female'; parts.push(t('flatmates.gWomen')); }
     else if (/\b(boys?|m[ae]n|males?|guys?)\b/.test(q)) { next.gender = 'male'; parts.push(t('flatmates.gMen')); }
 
-    const budgetM = q.match(/(\d+)\s*k/);
-    if (budgetM) next.budget = [BUDGET_MIN, parseInt(budgetM[1], 10) * 1000];
+    const budgetM = q.match(/(?:^|\D)(\d+)\s*k/);
+    if (budgetM) next.budget = [BUDGET_MIN, Number.parseInt(budgetM[1], 10) * 1000];
     const budgetD = q.match(/under\s*(\d{4,})/);
-    if (budgetD) next.budget = [BUDGET_MIN, parseInt(budgetD[1], 10)];
+    if (budgetD) next.budget = [BUDGET_MIN, Number.parseInt(budgetD[1], 10)];
     if (!budgetIsAny(next.budget)) parts.push('≤ ' + inr(next.budget[1]));
 
     const loc = (await localitiesIn(q)).map((l) => l.name)

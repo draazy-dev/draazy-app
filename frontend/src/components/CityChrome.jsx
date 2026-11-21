@@ -103,7 +103,7 @@ function CityModal({ modal, user, onClose, onSubmit }) {
     const mob = digits(form.mobile);
     if (!/^[6-9]\d{9}$/.test(mob)) { setErr('Enter a valid 10-digit mobile number'); return; }
     const email = isWaitlist ? form.email.trim() : '';
-    if (email && !/^\S+@\S+\.\S+$/.test(email)) { setErr('Enter a valid email address, or leave it blank'); return; }
+    if (email && !/^\S[^\s@]*@\S[^\s.]*\.\S+$/.test(email)) { setErr('Enter a valid email address, or leave it blank'); return; }
     setErr('');
     setBusy(true);
     try {

@@ -124,7 +124,7 @@ function OwnershipCase({ propertyId, listing, actorId, onRefresh, onVerification
   const record = (event) => {
     event.preventDefault();
     if (!canRecord) return;
-    runDecision('record', () => recordOwnershipEvidence(propertyId, {
+    void runDecision('record', () => recordOwnershipEvidence(propertyId, {
       documentId: form.documentId, docType: form.docType,
       issuedOn: form.issueDate,
       issuedAt: new Date(`${form.issueDate}T00:00:00+05:30`).toISOString(),

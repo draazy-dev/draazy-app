@@ -43,7 +43,7 @@ export default function Support() {
 
   useEffect(() => {
     let alive = true;
-    listFaqs().then((f) => alive && setFaqs(f));
+    void listFaqs().then((f) => alive && setFaqs(f));
     return () => { alive = false; };
   }, []);
 

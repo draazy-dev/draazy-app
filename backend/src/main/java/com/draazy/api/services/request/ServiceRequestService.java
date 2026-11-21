@@ -448,31 +448,31 @@ public class ServiceRequestService implements AbandonedCheckouts {
 
     private String filedCategory(AuthPrincipal caller, ServiceRequest request, String category) {
         String filedAs = ServiceRequestDrafting.customerCategory(request, category);
-        String side = RentAgreementReadiness.sideOf(filedAs);
-        if (side != null) {
-            int partyIndex = RentAgreementReadiness.partyIndex(filedAs);
-            if (isOps(caller)) {
-                return filedAs;
-            }
-            boolean ownSlot = identities.hasAcceptedSlot(request.getId(), caller.userId(),
-                    side, partyIndex);
-            if (ownSlot) {
-                return filedAs;
-            }
-            if (!caller.userId().equals(request.getRequesterId())) {
-                throw new ForbiddenException("You can file papers only for your own side of this agreement.");
-            }
-            if ("owner".equals(side) && ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType())
-                    && !ownerSide.requesterIsOwner(request)) {
-                throw RentAgreementOwnerSide.refusal();
-            }
-            boolean ownerHoldsTenantSide = "tenant".equals(side) && RentAgreementReadiness.ownerHoldsAll(request)
-                    && ownerSide.requesterIsOwner(request);
-            if (!ownerHoldsTenantSide && identities.hasLiveCoFillSlot(request.getId(), side, partyIndex)) {
-                throw new ForbiddenException("You can file papers only for your own side of this agreement.");
-            }
-        }
+        requireOwnSide(caller, request, filedAs);
         return filedAs;
+    }
+
+    private void requireOwnSide(AuthPrincipal caller, ServiceRequest request, String filedAs) {
+        String side = RentAgreementReadiness.sideOf(filedAs);
+        if (side == null) {
+            return;
+        }
+        int partyIndex = RentAgreementReadiness.partyIndex(filedAs);
+        if (isOps(caller) || identities.hasAcceptedSlot(request.getId(), caller.userId(), side, partyIndex)) {
+            return;
+        }
+        if (!caller.userId().equals(request.getRequesterId())) {
+            throw new ForbiddenException("You can file papers only for your own side of this agreement.");
+        }
+        if ("owner".equals(side) && ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType())
+                && !ownerSide.requesterIsOwner(request)) {
+            throw RentAgreementOwnerSide.refusal();
+        }
+        boolean ownerHoldsTenantSide = "tenant".equals(side) && RentAgreementReadiness.ownerHoldsAll(request)
+                && ownerSide.requesterIsOwner(request);
+        if (!ownerHoldsTenantSide && identities.hasLiveCoFillSlot(request.getId(), side, partyIndex)) {
+            throw new ForbiddenException("You can file papers only for your own side of this agreement.");
+        }
     }
 
     @Transactional

@@ -1,7 +1,7 @@
 import { isResidentialHome } from '../../data/propertyTypes.js';
 
 export const bedroomsOf = (bhk) => {
-  const n = parseInt(String(bhk ?? '').trim(), 10);
+  const n = Number.parseInt(String(bhk ?? '').trim(), 10);
   return Number.isFinite(n) && n > 0 ? n : 0;
 };
 

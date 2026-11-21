@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Trans, useTranslation } from 'react-i18next';
 import { ArrowRight, BadgeCheck, Bell, CalendarCheck, CheckCircle2, Loader2, Mail, Send, ShieldCheck, User, UserCircle } from 'lucide-react';
@@ -83,6 +83,7 @@ export default function Signup() {
   const [creating, setCreating] = useState(false);
   const [done, setDone] = useState(false);
   const redirectTimer = useRef(null);
+  const focusOnMount = useCallback((el) => { el?.focus(); }, []);
   useEffect(() => () => clearTimeout(redirectTimer.current), []);
   const turnstile = useTurnstile();
   const otp = useOtpFlow((m) => turnstile.withToken((tok) => sendOtpSvc({ mobile: m, turnstileToken: tok })));
@@ -104,7 +105,7 @@ export default function Signup() {
     const e = {};
     if (!isValidName(name.trim())) e.name = true;
     const emailVal = email.trim();
-    if (emailVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) e.email = true;
+    if (emailVal && !/^[^\s@]+@[^\s@][^\s@.]*\.[^\s@]+$/.test(emailVal)) e.email = true;
     if (!mobile.valid) e.mobile = true;
     if (!terms) e.terms = true;
     setErrs(e);
@@ -142,7 +143,7 @@ export default function Signup() {
       const code = referral.trim();
       if (wasNew) track('signup_completed', { role, referred: Boolean(code) });
       if (wasNew) {
-        redeemOnNewAccount(code).then((outcome) => {
+        void redeemOnNewAccount(code).then((outcome) => {
           if (outcome === 'refused' || outcome === 'invalid' || outcome === 'failed') toast(t('auth.referralNotApplied'), 'info');
         });
       }
@@ -200,7 +201,7 @@ export default function Signup() {
             <label htmlFor="signup-name" className="block text-sm font-medium text-gray-300 mb-2">{t('auth.fullName')} <span className="text-rose-400">*</span></label>
             <div className="relative">
               <User className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input id="signup-name" autoFocus autoComplete="name" enterKeyHint="next" maxLength={80} value={name} onChange={(e) => { setName(e.target.value); setErrs((x) => ({ ...x, name: false })); }} type="text" placeholder={t('auth.fullNamePlaceholder')} className={'w-full pl-10 pr-4 py-3.5 bg-white/5 border rounded-xl text-white text-sm placeholder-gray-500 focus:outline-none transition-all ' + (errs.name ? 'border-red-400' : 'border-white/10 focus:border-teal-400')} />
+              <input id="signup-name" ref={focusOnMount} autoComplete="name" enterKeyHint="next" maxLength={80} value={name} onChange={(e) => { setName(e.target.value); setErrs((x) => ({ ...x, name: false })); }} type="text" placeholder={t('auth.fullNamePlaceholder')} className={'w-full pl-10 pr-4 py-3.5 bg-white/5 border rounded-xl text-white text-sm placeholder-gray-500 focus:outline-none transition-all ' + (errs.name ? 'border-red-400' : 'border-white/10 focus:border-teal-400')} />
             </div>
             {errs.name ? <p className="text-red-400 text-xs mt-1.5 ml-1">{t('auth.errName')}</p> : null}
           </div>

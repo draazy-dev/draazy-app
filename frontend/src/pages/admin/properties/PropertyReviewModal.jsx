@@ -109,7 +109,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
       openCall.current = { key: callKey, promise: openCase(listing) };
     }
     const { promise } = openCall.current;
-    (async () => {
+    void (async () => {
       try {
         const caseFile = await promise;
         if (cancelled) return;
@@ -144,7 +144,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     if (!reviewKey || !commsOpen || commsLoadedFor === reviewKey) return undefined;
     let cancelled = false;
     const listing = review;
-    Promise.all([
+    void Promise.all([
       listOwnerOutreach(pid(listing)).then((rows) => { if (!cancelled) setOutreach(rows); }, () => { if (!cancelled) setOutreach([]); }),
       listNotes('listing', listing.id).then((rows) => { if (!cancelled) setNotes(rows); }, () => { if (!cancelled) setNotes([]); }),
     ]).then(() => { if (!cancelled) setCommsLoadedFor(reviewKey); });
@@ -167,7 +167,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
   useEffect(() => {
     if (!(waOpen || commsOpen) || templatesRequested.current) return;
     templatesRequested.current = true;
-    (async () => {
+    void (async () => {
       try {
         setWaTemplates(await listOutreachTemplates('whatsapp'));
       } catch {

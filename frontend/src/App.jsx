@@ -267,7 +267,7 @@ function BackOfficeEntry({ base, children }) {
   useEffect(() => {
     if (!readAccessToken()) return;
     const matches = matchRoutes(BACK_OFFICE_ROUTES, pathname, base);
-    Promise.all([AdminLayout.preload(), preloadablePage(matches?.at(-1)?.route.element)?.preload()])
+    void Promise.all([AdminLayout.preload(), preloadablePage(matches?.at(-1)?.route.element)?.preload()])
       .then(() => setReady(true));
   }, [base, pathname]);
   return ready ? children : <LoadingFallback />;

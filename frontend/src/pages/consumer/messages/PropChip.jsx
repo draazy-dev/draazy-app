@@ -6,7 +6,7 @@ import { fmtINR } from '../../../lib/format.js';
 const displayPrice = (p) => {
   if (!p?.price) return '';
   if (typeof p.price === 'string' && (p.price.includes('Cr') || p.price.includes('L') || p.price.includes('/mo') || p.price.includes(' '))) return p.price;
-  const num = typeof p.price === 'number' ? p.price : parseInt(String(p.price).replace(/[^\d]/g, ''), 10);
+  const num = typeof p.price === 'number' ? p.price : Number.parseInt(String(p.price).replace(/[^\d]/g, ''), 10);
   if (!num) return String(p.price);
   return p.deal === 'rent' ? `${fmtINR(num)}/mo` : fmtINR(num);
 };

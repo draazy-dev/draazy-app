@@ -121,7 +121,7 @@ export default function AdminProperties() {
     setFiltersTab(activeTab);
     setFilters(EMPTY_FILTERS);
   }
-  const page = Math.max(1, parseInt(params.get('page'), 10) || 1);
+  const page = Math.max(1, Number.parseInt(params.get('page'), 10) || 1);
   const setPage = useCallback((n) => setParams((prev) => {
     const next = new URLSearchParams(prev);
     if (n > 1) next.set('page', String(n)); else next.delete('page');

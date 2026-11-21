@@ -35,6 +35,8 @@ const TABS = [
   { key: 'societies', label: 'Society details', atom: 'societies:read' },
 ];
 
+const focusOnMount = (el) => { el?.focus(); };
+
 export default function AdminPlaces() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -139,7 +141,7 @@ export default function AdminPlaces() {
     const slugs = candidates.items.map((c) => c.slug).filter((s) => s && !dupesAsked.current.has(s));
     if (!slugs.length) return;
     slugs.forEach((s) => dupesAsked.current.add(s));
-    listDuplicatesForCandidates(slugs)
+    void listDuplicatesForCandidates(slugs)
       .then((bySlug) => slugs.map((s) => [s, bySlug[s] ?? DUPES_FAILED]))
       .catch((err) => {
         console.warn('[societies] Could not check the candidates for duplicates.', err);
@@ -312,8 +314,8 @@ export default function AdminPlaces() {
         {merge && (
           <>
             <p className="text-gray-400 text-sm mb-4">Fold <span className="text-white font-semibold">“{merge.cand.name}”</span> into a canonical society. Its listings, follows and reviews will read on that society instead; nothing is deleted, and the merge can be undone.</p>
-            <label className="block text-sm mb-1 text-gray-300">Merge into</label>
-            <input autoFocus value={merge.query} onChange={(e) => setMerge({ ...merge, query: e.target.value })} placeholder="Search societies…" className={inp} />
+            <label htmlFor="merge-into-search" className="block text-sm mb-1 text-gray-300">Merge into</label>
+            <input id="merge-into-search" ref={focusOnMount} value={merge.query} onChange={(e) => setMerge({ ...merge, query: e.target.value })} placeholder="Search societies…" className={inp} />
             <div className="mt-2 max-h-56 overflow-auto rounded-lg border border-white/10 divide-y divide-white/5">
               {mergeResults.length === 0 ? <div className="px-3 py-3 text-xs text-gray-500">No matches — try another name.</div> : mergeResults.map((r) => (
                 <button key={r.slug} onClick={() => setMerge({ ...merge, target: r.slug })} className={classNames('flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-white/5', merge.target === r.slug ? 'bg-brand-teal/10' : '')}>

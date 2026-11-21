@@ -245,7 +245,7 @@ jobs:
       # `npm ci` fails on lock drift, so the bundle uses the dependency tree CI resolved.
       - name: Install dependencies
         working-directory: frontend
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       # Vite inlines every `VITE_*`; this block is the complete build-time config.
       - name: Build

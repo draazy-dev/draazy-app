@@ -84,7 +84,7 @@ export default function Compare() {
   useEffect(() => {
     let alive = true;
     if (!ids.length) { setCompared([]); return () => { alive = false; }; }
-    compareProperties(ids)
+    void compareProperties(ids)
       .catch(() => [])
       .then((list) => { if (alive) setCompared(list); });
     return () => { alive = false; };

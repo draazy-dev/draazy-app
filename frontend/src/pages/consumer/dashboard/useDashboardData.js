@@ -170,7 +170,7 @@ export function useDashboardData({ user, toast, ownsProperty }) {
   useEffect(() => {
     if (ownsProperty === undefined) return undefined;
     let live = true;
-    loadFeed(ownsProperty !== true).then((feed) => {
+    void loadFeed(ownsProperty !== true).then((feed) => {
       if (!live) return;
       setRecent(feed.recent);
       setRecommended(feed.recommended);

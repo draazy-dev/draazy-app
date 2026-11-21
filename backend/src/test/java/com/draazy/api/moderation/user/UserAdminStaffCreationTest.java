@@ -92,7 +92,7 @@ class UserAdminStaffCreationTest extends AbstractApiTest {
                 .andReturn();
         String body = result.getResponse().getContentAsString();
 
-        String id = body.replaceAll("(?s).*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        String id = body.replaceAll("(?s)^.*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
         String inviteUrl = field(body, "inviteUrl");
         String token = inviteToken(inviteUrl);
         assertThat(inviteUrl).startsWith("http://localhost:5173/staff-invite#");
@@ -121,7 +121,7 @@ class UserAdminStaffCreationTest extends AbstractApiTest {
                                 .formatted(Teams.RENTAL)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        String id = created.replaceAll("(?s).*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        String id = created.replaceAll("(?s)^.*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
 
         String body = mvc.perform(post(Routes.Users.REISSUE_INVITE.replace("{id}", id))
                         .header(HttpHeaders.AUTHORIZATION, bearer(actor)))
@@ -153,7 +153,7 @@ class UserAdminStaffCreationTest extends AbstractApiTest {
                                 .formatted(Teams.RENTAL)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        String id = created.replaceAll("(?s).*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        String id = created.replaceAll("(?s)^.*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
         mvc.perform(post(Routes.Users.REISSUE_INVITE.replace("{id}", id))
                         .header(HttpHeaders.AUTHORIZATION, bearer(manager)))
                 .andExpect(status().isOk());

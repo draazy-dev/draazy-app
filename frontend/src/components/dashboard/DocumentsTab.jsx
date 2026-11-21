@@ -215,7 +215,7 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false, o
   const [rental, setRental] = useState({ tenancies: [], agreements: [], loaded: false });
   useEffect(() => {
     let alive = true;
-    Promise.all([
+    void Promise.all([
       myTenancies().catch(() => []),
       myRentAgreements().catch(() => []),
     ]).then(async ([rows, agreementRows]) => {
