@@ -664,7 +664,7 @@ values and `SANDBOX_BOOTSTRAP_ADMIN_RECOVER` are variables because they are iden
 that opens the bucket is a secret. Everything sensitive is a secret, never a variable, because a variable
 prints in the run log. All of them are **repository** secrets: the repository is private on GitHub Free,
 which ignores environment secrets and protection rules, so a job sees only the secrets it names.
-`SANDBOX_DIGITALOCEAN_ACCESS_TOKEN` (DO token `draazy-sandbox-deploy`) needs custom scopes **app: create, read, update** and nothing else.
+`SANDBOX_DIGITALOCEAN_ACCESS_TOKEN` (DO token `draazy-sandbox-deploy`) needs custom scopes **app: create, read, update** and **database: read** (the spec's dev database), nothing else.
 
 **There is no deployment branch policy.** A private repository on GitHub Free has no environments, so
 anyone with write access can dispatch any ref, including a branch that edits `do-app-sandbox.yaml` or
