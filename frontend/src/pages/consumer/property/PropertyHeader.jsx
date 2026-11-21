@@ -95,7 +95,7 @@ export default function PropertyHeader({ ctx, priceOnHero = false }) {
                   header={(
                     <div className="flex items-center gap-2 min-w-0">
                       <Icon name="shield-check" className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-                      <h3 className="text-white font-bold text-sm">{tr('property.assuredTitle')}</h3>
+                      <h2 className="text-white font-bold text-sm">{tr('property.assuredTitle')}</h2>
                       <span className="dz-tag text-emerald-300 bg-emerald-500/15 border border-emerald-500/25 font-semibold uppercase tracking-wide">{tr('property.trustedListing')}</span>
                     </div>
                   )}
