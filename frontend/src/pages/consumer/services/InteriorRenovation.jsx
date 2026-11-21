@@ -55,6 +55,12 @@ export default function InteriorRenovation() {
   const { user, isIn } = useAuth();
   const { toast } = useToast();
   const [lightbox, setLightbox] = useState(null);
+  const tileKey = (id) => (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setLightbox(IMG(id, 1400));
+    }
+  };
   const [ba, setBa] = useState(50);
   const [openFaq, setOpenFaq] = useState(-1);
   const [done, setDone] = useState(false);
@@ -155,7 +161,7 @@ export default function InteriorRenovation() {
           <div className="text-center mb-6 sm:mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.interior.servicesTitle')}</h2><p className="text-gray-400 text-sm mt-2 max-w-2xl mx-auto">{tr('services.interior.servicesSub')}</p></div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {SERVICES.map(([t, id, d], i) => (
-              <div key={t} className="glass-card rounded-2xl overflow-hidden tile" onClick={() => setLightbox(IMG(id, 1400))}>
+              <div key={t} className="glass-card rounded-2xl overflow-hidden tile" role="button" tabIndex={0} onKeyDown={tileKey(id)} onClick={() => setLightbox(IMG(id, 1400))}>
                 <div className="zoom h-44"><img src={IMG(id)} srcSet={srcSetFor(IMG(id))} sizes={CARD_SIZES} alt={tr('services.interior.service.' + i + '.name')} className="w-full h-full object-cover" loading="lazy" /></div>
                 <div className="p-5"><h3 className="text-white font-bold mb-1.5">{tr('services.interior.service.' + i + '.name')}</h3><p className="text-gray-400 text-sm leading-relaxed">{tr('services.interior.service.' + i + '.desc')}</p></div>
               </div>
@@ -167,7 +173,7 @@ export default function InteriorRenovation() {
           <div className="text-center mb-6 sm:mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.interior.stylesTitle')}</h2><p className="text-gray-400 text-sm mt-2 max-w-2xl mx-auto">{tr('services.interior.stylesSub')}</p></div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {STYLES.map(([t, id], i) => (
-              <div key={t} className="zoom tile theme-dark rounded-2xl relative h-40 sm:h-44" onClick={() => setLightbox(IMG(id, 1400))}>
+              <div key={t} className="zoom tile theme-dark rounded-2xl relative h-40 sm:h-44" role="button" tabIndex={0} onKeyDown={tileKey(id)} onClick={() => setLightbox(IMG(id, 1400))}>
                 <img src={IMG(id)} srcSet={srcSetFor(IMG(id))} sizes={CARD_SIZES} alt={tr('services.interior.style.' + i)} className="w-full h-full object-cover" loading="lazy" />
                 <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg,transparent 45%,rgb(var(--dz-c-ink) / .85) 100%)' }} />
                 <span className="absolute bottom-3 left-3 text-white font-semibold text-sm">{tr('services.interior.style.' + i)}</span>
@@ -192,7 +198,7 @@ export default function InteriorRenovation() {
           <div className="text-center mb-6 sm:mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.interior.projectsTitle')}</h2><p className="text-gray-400 text-sm mt-2 max-w-2xl mx-auto">{tr('services.interior.projectsSub')}</p></div>
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
             {PROJECTS.map(([t, id], i) => (
-              <div key={t} className="zoom tile theme-dark rounded-2xl relative h-48 sm:h-60 group" onClick={() => setLightbox(IMG(id, 1400))}>
+              <div key={t} className="zoom tile theme-dark rounded-2xl relative h-48 sm:h-60 group" role="button" tabIndex={0} onKeyDown={tileKey(id)} onClick={() => setLightbox(IMG(id, 1400))}>
                 <img src={IMG(id)} srcSet={srcSetFor(IMG(id))} sizes={CARD_SIZES} alt={tr('services.interior.project.' + i)} className="w-full h-full object-cover" loading="lazy" />
                 <div className="reveal-on-hover absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ background: 'linear-gradient(180deg,transparent 40%,rgb(var(--dz-c-ink) / .88) 100%)' }} />
                 <div className="reveal-on-hover absolute bottom-0 left-0 right-0 p-4 translate-y-2 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
@@ -327,7 +333,7 @@ export default function InteriorRenovation() {
       </div>
 
       {lightbox ? (
-        <div className="fixed inset-0 z-[1500] flex items-center justify-center p-6" style={{ background: 'rgb(var(--dz-c-black) / .92)', backdropFilter: 'blur(8px)' }} onClick={() => setLightbox(null)}>
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center p-6" style={{ background: 'rgb(var(--dz-c-black) / .92)', backdropFilter: 'blur(8px)' }} role="presentation" onClick={() => setLightbox(null)}>
           <img src={lightbox} alt={tr('services.interior.lightboxAlt')} className="rounded-2xl" style={{ maxWidth: '92vw', maxHeight: '86vh', boxShadow: '0 24px 80px rgb(var(--dz-c-black) / .6)' }} />
         </div>
       ) : null}

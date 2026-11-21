@@ -39,7 +39,7 @@ export function ContactBox({ p, isIn, toast }) {
       return;
     }
     track('contact_click', { action: 'request_number', id: propId });
-    captureLead({ context: 'request_number', property: String(propId) });
+    void captureLead({ context: 'request_number', property: String(propId) });
 
     const back = window.location.pathname + window.location.search + window.location.hash;
     setBusy(true);

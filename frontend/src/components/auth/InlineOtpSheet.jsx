@@ -91,7 +91,7 @@ export default function InlineOtpSheet({ open, reason = 'contact', title: titleT
     try {
       const who = await login({ mobile: mobile.value, otp: otp.otp, remember: true });
       if (who && !who.name?.trim()) {
-        redeemOnNewAccount();
+        void redeemOnNewAccount();
         verifiedUser.current = who;
         setNeedsProfile(true);
         return;
@@ -112,7 +112,7 @@ export default function InlineOtpSheet({ open, reason = 'contact', title: titleT
     const nameVal = name.trim();
     const emailVal = email.trim();
     if (!isValidName(nameVal)) next.name = true;
-    if (emailVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) next.email = true;
+    if (emailVal && !/^[^\s@]+@[^\s@][^\s@.]*\.[^\s@]+$/.test(emailVal)) next.email = true;
     setProfileErrs(next);
     if (Object.keys(next).length) return;
     submittingRef.current = true;
@@ -145,14 +145,14 @@ export default function InlineOtpSheet({ open, reason = 'contact', title: titleT
   const submit = (e) => {
     e.preventDefault();
     if (needsProfile) {
-      saveProfile();
+      void saveProfile();
       return;
     }
     if (otp.otpSent) {
-      verify();
+      void verify();
       return;
     }
-    sendOtp();
+    void sendOtp();
   };
 
   const footer = needsProfile ? (

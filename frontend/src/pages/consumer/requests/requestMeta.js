@@ -77,7 +77,7 @@ export const messageOf = (item) => item.message || (DEFAULT_MESSAGE[item.kind] |
 export const initialsOf = (name) => String(name || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('') || '?';
 
 export function remindState(item, now) {
-  const next = item.reminders?.nextAt ? Date.parse(item.reminders.nextAt) : NaN;
+  const next = item.reminders?.nextAt ? Date.parse(item.reminders.nextAt) : Number.NaN;
   if (!isPending(item) || Number.isNaN(next)) return null;
   if (next <= now) return { enabled: true, label: 'Remind' };
   const minutes = Math.max(1, Math.ceil((next - now) / 60000));

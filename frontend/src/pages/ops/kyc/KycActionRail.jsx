@@ -76,7 +76,7 @@ export default function KycActionRail({ detail, kase, user, canWrite, checklistL
   const revoke = () => {
     if (!reasonReady(revocation.reason) || !canStaffAct) return;
     if (!revocation.confirm) setRevocation((r) => ({ ...r, confirm: true }));
-    else run(() => revokeIdentityReview(detail.id, revocation.reason.trim()), 'Could not revoke this badge.');
+    else void run(() => revokeIdentityReview(detail.id, revocation.reason.trim()), 'Could not revoke this badge.');
   };
   const forceRelease = () => {
     if (!releaseConfirm) setReleaseConfirm(true);

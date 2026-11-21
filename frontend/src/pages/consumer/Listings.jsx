@@ -301,7 +301,7 @@ export default function Listings() {
   const size = effView === 'map' ? MAP_MARKER_CAP : PAGE_SIZE;
 
   const askedLocalitiesRef = useRef(new Set());
-  const locSlugsKey = [...new Set([...f.localities, ...(mapGated ? suggestedMapLocalities : [])])].sort().join(',');
+  const locSlugsKey = [...new Set([...f.localities, ...(mapGated ? suggestedMapLocalities : [])])].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join(',');
   useEffect(() => {
     locSlugsKey.split(',').filter((slug) => slug && !locNameBySlug[slug] && !askedLocalitiesRef.current.has(slug)).forEach((slug) => {
       askedLocalitiesRef.current.add(slug);
@@ -345,7 +345,7 @@ export default function Listings() {
 
   const ptr = usePullToRefresh(search.refresh);
 
-  const locSig = [...f.localities].sort().join(',');
+  const locSig = [...f.localities].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join(',');
   const mapFocus = useMemo(() => {
     if (!f.localities.size) return [];
     return localities
@@ -369,7 +369,7 @@ export default function Listings() {
     const key = `${loc}|${deferredF.deal}|${bhk}`;
     if (key === lastSearchIntent || (!loc && !bhk)) return;
     lastSearchIntent = key;
-    recordSignal({ kind: 'search', localitySlug: loc, deal: deferredF.deal, bhk });
+    void recordSignal({ kind: 'search', localitySlug: loc, deal: deferredF.deal, bhk });
   }, [deferredF, loaded]);
 
   const activeChips = useMemo(
@@ -389,7 +389,7 @@ export default function Listings() {
 
   const parseTyped = async () => {
     const parsed = await parseWithLocalities(aiQuery, () => parseCtxRef.current);
-    parsed?.hits.filter((l) => parsed.next.localities.has(l.slug)).forEach(addLocalityOption);
+    parsed?.hits.filter((l) => parsed.next.localities.has(l.slug)).forEach((l) => addLocalityOption(l));
     return parsed;
   };
 

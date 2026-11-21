@@ -7,7 +7,7 @@ function defaultParse(str) {
   if (!s) return null;
   const m = s.match(/^(-?\d*\.?\d+)(cr|crore|l|lakh|lac|k)?/);
   if (!m) return null;
-  let n = parseFloat(m[1]);
+  let n = Number.parseFloat(m[1]);
   if (Number.isNaN(n)) return null;
   const unit = m[2];
   if (unit === 'cr' || unit === 'crore') n *= 1e7;

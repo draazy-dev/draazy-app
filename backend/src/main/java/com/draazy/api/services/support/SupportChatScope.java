@@ -10,7 +10,7 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 
 /** Which chat contexts a staff member may see; `desks` narrows the request context to their own teams. */
 record SupportChatScope(boolean full, Set<String> contexts, Set<String> desks) {
-    static final SupportChatScope FULL = new SupportChatScope(true, Set.of(), Set.of());
+    static final SupportChatScope FULL_SCOPE = new SupportChatScope(true, Set.of(), Set.of());
 
     private static final List<String> VOCABULARY = List.of("general", "property", "flatmate", "request", "identity",
             "invoice");

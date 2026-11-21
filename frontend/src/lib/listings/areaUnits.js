@@ -29,7 +29,7 @@ const PROFILES = {
 const roundSqft = (n) => Math.round((Number(n) || 0) * UNIT_FACTORS.sqft);
 const clean = (n) => {
   const fixed = Number(Number(n).toFixed(2));
-  return Number.isInteger(fixed) ? String(fixed) : String(fixed);
+  return String(fixed);
 };
 
 export const unitLabel = (unit) => UNIT_LABELS[unit] || UNIT_LABELS.sqft;

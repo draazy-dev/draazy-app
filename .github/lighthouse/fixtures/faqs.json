@@ -1,0 +1,82 @@
+[
+ {
+  "id": "fa900001-0000-4000-8000-00000000f007",
+  "question": "Which areas of Pune do you cover?",
+  "answer": "We're Pune-first: Kothrud, Hinjewadi, Baner, Wakad, Kharadi, Viman Nagar, Hadapsar, PCMC and most other localities. Coverage keeps expanding — if your area is thin on listings, set an alert and we'll notify you when new ones go live.",
+  "category": "Coverage",
+  "translations": {}
+ },
+ {
+  "id": "fa900001-0000-4000-8000-00000000f001",
+  "question": "Is Draazy really zero brokerage?",
+  "answer": "Yes — always. You connect directly with verified owners and pay zero brokerage on any rent or resale deal. We earn only from optional plans and add-on services like rent agreements, never a cut of your rent or deposit.",
+  "category": "General",
+  "translations": {
+   "mr": {
+    "answer": "होय — नेहमीच. तुम्ही थेट मालकांशी संपर्क साधता आणि कोणत्याही भाडे किंवा पुनर्विक्री व्यवहारावर शून्य दलाली भरता.",
+    "category": "सर्वसाधारण",
+    "question": "Draazy खरंच शून्य दलाली आहे का?"
+   }
+  }
+ },
+ {
+  "id": "fa900001-0000-4000-8000-00000000f004",
+  "question": "Can I list my property for free?",
+  "answer": "Yes. Owner Free lets you keep one live listing at no cost, with unlimited enquiries. Owner Plus and Owner Pro raise the listing limit and add featured placement, priority support and, on Pro, a dedicated manager — start free and upgrade any time from the Plans page.",
+  "category": "Owners",
+  "translations": {}
+ },
+ {
+  "id": "fa900001-0000-4000-8000-00000000f005",
+  "question": "Is my payment and deposit safe?",
+  "answer": "Pay a deposit or rent only after you've visited the property and signed an agreement. Draazy never asks you to transfer a token to 'block' a flat before a visit — treat any such request as a red flag and report it.",
+  "category": "Payments",
+  "translations": {}
+ },
+ {
+  "id": "fa900001-0000-4000-8000-00000000f008",
+  "question": "How do refunds work?",
+  "answer": "Paid plans and services are refundable as per each plan's terms. Approved refunds go back to your original payment method, typically within 5–7 working days. Raise a ticket above with your payment reference and we'll track it for you.",
+  "category": "Payments",
+  "translations": {}
+ },
+ {
+  "id": "fa900001-0000-4000-8000-00000000f010",
+  "question": "How does refer and earn work?",
+  "answer": "Open Refer a friend and type your friend's mobile number. Draazy sends them your invite on WhatsApp, or opens your own WhatsApp if we can't send it. When your friend gets going, you get 50% off the Draazy service fee of your next rent agreement. Stamp duty and registration charges are not discounted. Your friend gets a welcome gift too.",
+  "category": "Payments",
+  "translations": {}
+ },
+ {
+  "id": "fa900001-0000-4000-8000-00000000f003",
+  "question": "How do I contact an owner or schedule a visit?",
+  "answer": "Open any listing and tap 'Contact owner' to send a contact request — the owner approves it and their number is revealed then, usually the same day. 'Schedule visit' lets you pick a date and slot the same way. You'll see the response in Messages and in your notifications — no broker sits in between.",
+  "category": "Seekers",
+  "translations": {}
+ },
+ {
+  "id": "fa900001-0000-4000-8000-00000000f006",
+  "question": "Do you offer rent agreements?",
+  "answer": "Yes — drafting, stamp duty and e-registration with a doorstep biometric visit. Our platform fee is ₹499, and government stamp duty and registration charges are added, worked out from your rent, deposit and term. You fill the details online and our team prepares the draft.",
+  "category": "Services",
+  "translations": {}
+ },
+ {
+  "id": "fa900001-0000-4000-8000-00000000f002",
+  "question": "How are owners and listings verified?",
+  "answer": "Every verified owner has had an Aadhaar, PAN or other government ID and a live selfie reviewed by our trust team, and wherever possible we confirm ownership documents before a listing goes live. Verified listings carry a badge. If something looks off, use 'Report listing' and our trust team reviews it within 24 hours.",
+  "category": "Trust",
+  "translations": {
+   "mr": {
+    "question": "मालक आणि जाहिराती कशा पडताळल्या जातात?"
+   }
+  }
+ },
+ {
+  "id": "fa900001-0000-4000-8000-00000000f009",
+  "question": "How do I report a suspicious listing or user?",
+  "answer": "Use 'Report' on any listing or message, or raise a ticket here under 'Technical / Bug' or 'Something else'. Our trust team investigates within 24 hours and removes anything that breaks our policies.",
+  "category": "Trust",
+  "translations": {}
+ }
+]

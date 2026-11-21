@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
 import PropertyImage from '../../../components/ui/PropertyImage.jsx';
@@ -10,7 +10,7 @@ import ActionSheet from './ActionSheet.jsx';
 const displayPrice = (p) => {
   if (!p?.price) return '';
   if (typeof p.price === 'string' && (p.price.includes('Cr') || p.price.includes('L') || p.price.includes('/mo') || p.price.includes(' '))) return p.price;
-  const num = typeof p.price === 'number' ? p.price : parseInt(String(p.price).replace(/[^\d]/g, ''), 10);
+  const num = typeof p.price === 'number' ? p.price : Number.parseInt(String(p.price).replace(/[^\d]/g, ''), 10);
   if (!num) return String(p.price);
   return p.deal === 'rent' ? `${fmtINR(num)}/mo` : fmtINR(num);
 };
@@ -79,6 +79,10 @@ export default function Inbox({
   const [swiped, setSwiped] = useState(null);
   const [searching, setSearching] = useState(false);
   const searchOpen = searching || search !== '';
+  const searchRef = useRef(null);
+  useEffect(() => {
+    if (searchOpen) searchRef.current?.focus();
+  }, [searchOpen]);
   const toggleSearch = () => {
     if (searchOpen) setSearch('');
     setSearching(!searchOpen);
@@ -128,7 +132,7 @@ export default function Inbox({
           </button>
         </div>
         {searchOpen ? (
-          <div className="pc-search"><Icon name="search" className="w-4 h-4" /><input autoFocus value={search} onChange={(e) => setSearch(e.target.value)} type="text" enterKeyHint="search" placeholder={t('misc.msgSearchPlaceholder')} aria-label={t('misc.msgSearchAria')} /></div>
+          <div className="pc-search"><Icon name="search" className="w-4 h-4" /><input ref={searchRef} value={search} onChange={(e) => setSearch(e.target.value)} type="text" enterKeyHint="search" placeholder={t('misc.msgSearchPlaceholder')} aria-label={t('misc.msgSearchAria')} /></div>
         ) : null}
       </div>
       <div className="pc-convs">

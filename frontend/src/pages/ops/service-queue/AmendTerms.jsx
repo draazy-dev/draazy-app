@@ -55,7 +55,7 @@ export default function AmendTerms({ request, onUpdated }) {
     event.preventDefault();
     const next = changes();
     if (Object.keys(next).length === 0) { toast('Change at least one term first.', 'error'); return; }
-    run(() => proposeServiceRequestAmendment(request.id, { ...next, reason: reason.trim() }),
+    void run(() => proposeServiceRequestAmendment(request.id, { ...next, reason: reason.trim() }),
       'Revised terms sent. The customer must accept them before the draft is shared.');
   };
 

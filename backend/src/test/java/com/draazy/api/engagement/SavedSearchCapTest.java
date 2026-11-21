@@ -49,7 +49,7 @@ class SavedSearchCapTest extends AbstractApiTest {
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();
             if (n == 1) {
-                firstId = body.replaceAll("(?s).*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+                firstId = body.replaceAll("(?s)^.*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
             }
         }
 

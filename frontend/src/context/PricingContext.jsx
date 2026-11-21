@@ -23,7 +23,7 @@ export function PricingProvider({ children }) {
       }
     };
 
-    sync();
+    void sync();
     window.addEventListener('draazy-settings-change', sync);
     window.addEventListener('storage', sync);
     return () => {

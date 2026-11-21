@@ -456,7 +456,7 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
                             .content(FlatmateGroupFixture.hunting("Four of us", "Baner", "any", 45000, 4, 1)))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();
-            String groupId = groupJson.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+            String groupId = groupJson.replaceAll("(?m)^.*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
 
             String appId = jdbc.queryForObject(
                     "insert into flatmate_group_applications (listing_id, group_id, applicant_id) "

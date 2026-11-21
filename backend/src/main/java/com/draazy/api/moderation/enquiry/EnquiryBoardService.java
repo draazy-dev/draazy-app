@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -160,7 +161,7 @@ public class EnquiryBoardService {
                 ? null : properties.findById(row.getPropertyId()).orElse(null);
         return new AdminEnquiryDto(
                 row.getId().toString(),
-                row.getPropertyId().toString(),
+                Objects.toString(row.getPropertyId(), null),
                 listing == null ? null : listing.getTitle(),
                 listing == null ? null : listing.getLocalitySlug(),
                 requester == null ? null : requester.getName(),
@@ -185,7 +186,7 @@ public class EnquiryBoardService {
                 ? null : properties.findById(row.getPropertyId()).orElse(null);
         return new AdminVisitDto(
                 row.getId().toString(),
-                row.getPropertyId().toString(),
+                Objects.toString(row.getPropertyId(), null),
                 listing == null ? null : listing.getTitle(),
                 listing == null ? null : listing.getLocalitySlug(),
                 visitor == null ? null : visitor.getName(),
@@ -216,7 +217,7 @@ public class EnquiryBoardService {
                 ? null : properties.findById(row.getPropertyId()).orElse(null);
         return new AdminDealDto(
                 row.getId().toString(),
-                row.getPropertyId().toString(),
+                Objects.toString(row.getPropertyId(), null),
                 listing == null ? null : listing.getTitle(),
                 listing == null ? null : listing.getLocalitySlug(),
                 row.getDeal(),

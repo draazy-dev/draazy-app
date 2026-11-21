@@ -930,6 +930,6 @@ class ErasureCoverageTest extends AbstractApiTest {
                         .content("{\"reason\":\"schema coverage check\"}"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return body.replaceAll("^.*\"id\":\"([^\"]+)\".*$", "$1");
+        return body.replaceAll("^.*\"id\":\"([^\"]+)\".*", "$1");
     }
 }

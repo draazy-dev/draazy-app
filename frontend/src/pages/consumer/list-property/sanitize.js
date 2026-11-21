@@ -12,7 +12,7 @@ export const toMoney = (v) => {
 };
 
 export const roundMoney = (v) => {
-  const rupees = Math.round(parseFloat(v));
+  const rupees = Math.round(Number.parseFloat(v));
   return Number.isFinite(rupees) ? String(rupees) : '';
 };
 

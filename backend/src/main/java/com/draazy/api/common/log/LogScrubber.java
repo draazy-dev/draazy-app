@@ -34,6 +34,16 @@ public final class LogScrubber {
         if (text == null || text.isEmpty()) {
             return text;
         }
+        try {
+            return scrubAll(text);
+        } catch (StackOverflowError e) {
+            // A pathological input (thousands of dot-labels) overflows the regex engine's recursion;
+            // withhold it rather than let the caller fail or log it unscrubbed.
+            return "[unscrubbable]";
+        }
+    }
+
+    private static String scrubAll(String text) {
         String safe = DB_ROW.matcher(text).replaceAll("$1[row])");
         safe = DB_KEY.matcher(safe).replaceAll("$1[value])");
         safe = QUERY.matcher(safe).replaceAll("");

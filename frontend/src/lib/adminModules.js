@@ -95,11 +95,16 @@ export const deskFromFunction = (fn) => String(fn || '').startsWith(DESK_FUNCTIO
 
 export const moduleLabel = (key) => MODULE_BY_KEY[key]?.label || key;
 
+const stripTrailingSlashes = (s) => {
+  let end = s.length;
+  while (end > 0 && s[end - 1] === '/') end--;
+  return s.slice(0, end);
+};
 export const portalBase = (user) => (user?.role === 'staff' ? '/staff' : '/admin');
 export const portalPath = (user, path) => String(path).replace(/^\/(admin|staff)(?=[/?#]|$)/, portalBase(user));
 
 export function moduleForPath(pathname) {
-  const path = portalPath({ role: 'admin' }, pathname).replace(/\/+$/, '') || '/admin';
+  const path = stripTrailingSlashes(portalPath({ role: 'admin' }, pathname)) || '/admin';
   return ADMIN_MODULES
     .filter((m) => path === m.path || (!m.end && path.startsWith(`${m.path}/`)))
     .sort((a, b) => b.path.length - a.path.length)[0] || null;

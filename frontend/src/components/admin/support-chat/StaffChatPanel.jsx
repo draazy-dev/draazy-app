@@ -145,7 +145,7 @@ export default function StaffChatPanel({ userId, initialAbout = null, compact = 
   const send = () => {
     const text = draft.trim();
     if (!text || busy) return;
-    act(async () => {
+    void act(async () => {
       const msg = await replyToSupportChat(userId, text, parseContextKey(selected));
       setChat((c) => (c ? { ...c, messages: [...c.messages, msg] } : c));
       setDraft('');

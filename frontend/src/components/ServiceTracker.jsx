@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from './Icon.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -87,6 +87,7 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests', on
   const mobile = user?.mobile || '';
   const [tick, setTick] = useState(0);
   const [changeReq, setChangeReq] = useState(null);
+  const changeNoteId = useId();
   const [changeNote, setChangeNote] = useState('');
   const [otpDraft, setOtpDraft] = useState({});
   const [showPast, setShowPast] = useState(false);
@@ -114,7 +115,7 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests', on
   useEffect(() => {
     if (!isIn || !mobile) { setRequests([]); return undefined; }
     let alive = true;
-    (async () => {
+    void (async () => {
       try {
         const requests = await listServiceRequests(typeFilter, tick ? undefined : REVISIT_READ);
         if (alive) setRequests([...requests].sort((a, b) => (rank(a) - rank(b)) || ((b.updatedAt || 0) - (a.updatedAt || 0))));
@@ -338,8 +339,8 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests', on
               </div>
               <button onClick={() => setChangeReq(null)} className="dz-modal-x" aria-label="Close"><Icon name="x" className="w-5 h-5" /></button>
             </div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">What would you like changed?</label>
-            <textarea autoFocus value={changeNote} onChange={(e) => setChangeNote(e.target.value)} rows={4} className="w-full px-4 py-3 rounded-xl text-white text-sm resize-none border border-white/10 bg-white/[0.03] focus:border-brand-teal-2 outline-none mb-4" placeholder="e.g. Please correct the monthly rent to ₹32,000 and set the lock-in to 6 months." />
+            <label htmlFor={changeNoteId} className="block text-sm font-medium text-slate-300 mb-2">What would you like changed?</label>
+            <textarea id={changeNoteId} autoFocus value={changeNote} onChange={(e) => setChangeNote(e.target.value)} rows={4} className="w-full px-4 py-3 rounded-xl text-white text-sm resize-none border border-white/10 bg-white/[0.03] focus:border-brand-teal-2 outline-none mb-4" placeholder="e.g. Please correct the monthly rent to ₹32,000 and set the lock-in to 6 months." />
             <div className="flex gap-2">
               <button type="button" onClick={() => setChangeReq(null)} className="btn-outline flex-1 py-2.5 rounded-xl text-gray-200 text-sm font-semibold">Cancel</button>
               <button type="button" onClick={submitChanges} disabled={!changeNote.trim() || busy != null} className="btn-teal flex-1 py-2.5 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"><Icon name="rotate-ccw" className="w-4 h-4" /> Send request</button>

@@ -73,7 +73,7 @@ export default function StaffLogin() {
       setError('Enter your work email and password.');
       return;
     }
-    run(async () => {
+    void run(async () => {
       const res = await staffLogin({ email: email.trim(), password });
       setChallenge(res.challenge);
       if (res.mfa === 'enrol') {
@@ -93,7 +93,7 @@ export default function StaffLogin() {
       setError('Enter the 6-digit code from your authenticator app.');
       return;
     }
-    run(async () => {
+    void run(async () => {
       if (step === 'enrol') {
         const { user, recoveryCodes } = await staffConfirm({ challenge, code: code.trim() });
         setRecovery({ user, codes: recoveryCodes });

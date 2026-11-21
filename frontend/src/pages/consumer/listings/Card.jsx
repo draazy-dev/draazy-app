@@ -114,7 +114,7 @@ const Card = memo(function Card({ p, locName, index = 0, list = false, linkState
           <div className="lr-body">
             <div className="lr-info">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-base font-bold text-white">{title}</h3>
+                <h2 className="text-base font-bold text-white">{title}</h2>
                 {p.ownerVerified ? <span className="badge-verified dz-tag font-bold uppercase tracking-wider"><Icon name="user-check" /> {posterVerifiedLabel}</span> : null}
                 {p.ownershipVerified ? <span className="badge-rera dz-tag font-bold uppercase tracking-wider"><Icon name="file-check" /> {t('property.ownershipVerified')}</span> : null}
                 {p.reraId ? <span className="dz-tag dz-tag--muted font-bold uppercase tracking-wider"><Icon name="file-text" /> {t('listings.reraBadge')}</span> : null}
@@ -135,9 +135,9 @@ const Card = memo(function Card({ p, locName, index = 0, list = false, linkState
             </div>
             <div className="lr-aside">
               <span className="lr-status">{status}</span>
-              <h3 className="text-xl font-extrabold text-white mt-1">
+              <p className="text-xl font-extrabold text-white mt-1">
                 {isRent ? <>₹{(p.price || 0).toLocaleString('en-IN')}<span className="text-sm font-medium text-gray-400">{t('listings.perMonth')}</span></> : fmtINR(p.price)}
-              </h3>
+              </p>
               {sub ? <span className="text-[11px] text-gray-500 mt-0.5">{sub}</span> : null}
               <span className="lr-cta mt-3">{t('listings.viewDetails')} <Icon name="arrow-right" className="w-4 h-4" /></span>
             </div>
@@ -168,16 +168,16 @@ const Card = memo(function Card({ p, locName, index = 0, list = false, linkState
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[15px] font-bold text-white leading-snug">{title}</p>
+            <h2 className="text-[15px] font-bold text-white leading-snug">{title}</h2>
             <p className="flex items-center gap-1 text-xs text-gray-400 mt-1">
               <Icon name="map-pin" className="w-3 h-3 text-teal-400 flex-shrink-0" />
               <span className="truncate">{place}</span>
             </p>
           </div>
           <div className="flex-shrink-0 text-right">
-            <h3 className="text-lg font-extrabold text-white leading-tight whitespace-nowrap">
+            <p className="text-lg font-extrabold text-white leading-tight whitespace-nowrap">
               {isRent ? <>₹{(p.price || 0).toLocaleString('en-IN')}<span className="text-sm font-normal text-gray-400">{t('listings.perMonth')}</span></> : fmtINR(p.price)}
-            </h3>
+            </p>
             {isRent
               ? (depositLabel ? <span className="block text-[11px] text-gray-400 mt-0.5 whitespace-nowrap">{depositLabel}</span> : null)
               : (psf > 0 ? <span className="block text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">₹{psf.toLocaleString('en-IN')}<span className="text-gray-400">/{t('listings.sqft')}</span></span> : null)}

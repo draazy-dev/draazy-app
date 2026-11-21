@@ -99,12 +99,14 @@ public class ErrorLogAppender extends AppenderBase<ILoggingEvent> {
             try {
                 store.record(queue.take());
             } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
                 return;
             } catch (RuntimeException e) {
                 dropped.incrementAndGet();
                 try {
                     Thread.sleep(BACKOFF_MS);
                 } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
                     return;
                 }
             }

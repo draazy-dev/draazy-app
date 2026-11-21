@@ -1,12 +1,21 @@
 import { parseAmount } from '../../../lib/format';
 
+export const groupPairs = (s) => s.replace(/\d+/g, (run, at) => {
+  let out = '';
+  for (let k = 0; k < run.length; k++) {
+    if ((k > 0 || (at > 0 && /\w/.test(s[at - 1]))) && (run.length - k) % 2 === 0) out += ',';
+    out += run[k];
+  }
+  return out;
+});
+
 export const formatIndian = (v) => {
   const raw = String(v ?? '');
-  const s = raw.includes('.') ? String(Math.round(parseFloat(raw.replace(/[^\d.]/g, ''))) || '') : raw.replace(/\D/g, '');
+  const s = raw.includes('.') ? String(Math.round(Number.parseFloat(raw.replace(/[^\d.]/g, ''))) || '') : raw.replace(/\D/g, '');
   if (!s) return '';
   const last3 = s.slice(-3);
   const rest = s.slice(0, -3);
-  return (rest ? rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' : '') + last3;
+  return (rest ? groupPairs(rest) + ',' : '') + last3;
 };
 
 export const formatMoneyInput = (v) => {

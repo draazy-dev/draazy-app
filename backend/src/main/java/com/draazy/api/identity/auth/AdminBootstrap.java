@@ -29,7 +29,7 @@ public class AdminBootstrap implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(AdminBootstrap.class);
     private static final long BOOTSTRAP_LOCK = 0xA88L;
     private static final Duration INVITE_TTL = Duration.ofHours(1);
-    private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    private static final Pattern EMAIL_FORMAT = Pattern.compile("^[^@\\s]++@[^@\\s][^@\\s.]*+\\.[^@\\s]++$");
 
     private final UserRepository users;
     private final StaffInviteService invites;
@@ -63,9 +63,10 @@ public class AdminBootstrap implements ApplicationRunner {
         this.mailer = mailer;
         this.email = blankToEmpty(email);
         this.mobile = blankToEmpty(mobile);
-        this.name = blankToEmpty(name).isBlank() ? "Administrator" : name.trim();
+        String trimmedName = blankToEmpty(name);
+        this.name = trimmedName.isBlank() ? "Administrator" : trimmedName;
         this.recover = blankToEmpty(recover);
-        this.baseUrl = blankToEmpty(baseUrl).replaceAll("/+$", "");
+        this.baseUrl = blankToEmpty(baseUrl).replaceAll("(?<!/)/+$", "");
         this.mailEnabled = mailEnabled;
     }
 
@@ -138,7 +139,7 @@ public class AdminBootstrap implements ApplicationRunner {
 
     private Contact contactOrNull() {
         String normalisedEmail = normaliseEmail(email);
-        if (!EMAIL.matcher(normalisedEmail).matches()) {
+        if (!EMAIL_FORMAT.matcher(normalisedEmail).matches()) {
             log.error("Admin bootstrap skipped: BOOTSTRAP_ADMIN_EMAIL is not a valid email address");
             return null;
         }

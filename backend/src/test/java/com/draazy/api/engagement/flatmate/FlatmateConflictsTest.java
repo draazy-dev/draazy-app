@@ -14,7 +14,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 @DisplayName("The 409 sub-code marker, as the client parses it")
 class FlatmateConflictsTest {
-    private static final Pattern CLIENT_MARKER = Pattern.compile("\\s*\\(([a-z_]+)\\)\\s*$");
+    private static final Pattern CLIENT_MARKER = Pattern.compile("\\(([a-z_]+)\\)\\s*$");
 
     private static String subCodeAsClientSeesIt(ConflictException refusal) {
         Matcher hit = CLIENT_MARKER.matcher(refusal.getMessage());

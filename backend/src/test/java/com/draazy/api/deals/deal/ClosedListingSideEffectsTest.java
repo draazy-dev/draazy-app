@@ -54,7 +54,7 @@ class ClosedListingSideEffectsTest extends AbstractApiTest {
                                 + Instant.now().plus(2, ChronoUnit.DAYS) + "\"}"))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return body.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
+        return body.replaceAll("^.*?\"id\":\"([^\"]+)\".*", "$1");
     }
 
     @Test

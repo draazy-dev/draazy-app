@@ -7,6 +7,7 @@ import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
@@ -46,18 +47,19 @@ public final class PostgresWriteRateLimitStore implements WriteRateLimitStore {
     @Override
     public int tryAcquire(String key, Instant now) {
         Timestamp at = Timestamp.from(now);
-        Counter counter;
+        Optional<Counter> acquired;
         try {
-            counter = ownTx.execute(status -> jdbc.queryForObject(UPSERT,
+            acquired = Optional.ofNullable(ownTx.execute(status -> jdbc.queryForObject(UPSERT,
                     (rs, i) -> new Counter(rs.getInt(1), rs.getTimestamp(2).toInstant()),
-                    bucket(key), Timestamp.from(now.plus(window)), at, at));
+                    bucket(key), Timestamp.from(now.plus(window)), at, at)));
         } catch (DataAccessException e) {
             log.error("Postgres rate-limit store unavailable; falling back to per-instance counting", e);
             return fallback.tryAcquire(key, now);
         }
-        if (counter == null) {
+        if (acquired.isEmpty()) {
             return fallback.tryAcquire(key, now);
         }
+        Counter counter = acquired.get();
         if (counter.hits <= budget) {
             return 0;
         }

@@ -69,9 +69,20 @@ final class DataExportRedaction {
         };
     }
 
+    private static final Class<?> PG_OBJECT = pgObjectClass();
+
+    // The driver is runtime-scoped, so its class cannot be named at compile time.
+    private static Class<?> pgObjectClass() {
+        try {
+            return Class.forName("org.postgresql.util.PGobject");
+        } catch (ClassNotFoundException e) {
+            return null;
+        }
+    }
+
     private static Object unwrap(Object raw) {
         String text = String.valueOf(raw);
-        if (!raw.getClass().getName().equals("org.postgresql.util.PGobject")) {
+        if (raw.getClass() != PG_OBJECT) {
             return text;
         }
         try {

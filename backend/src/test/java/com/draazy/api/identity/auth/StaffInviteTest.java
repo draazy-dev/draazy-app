@@ -60,7 +60,7 @@ class StaffInviteTest extends AbstractApiTest {
                                 .formatted(mobile, email, role, team, MAKERS_CHOICE)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return body.replaceAll("(?s).*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        return body.replaceAll("(?s)^.*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
     private String plantToken(String userId) {

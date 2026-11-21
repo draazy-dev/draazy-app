@@ -128,7 +128,7 @@ function PdfViewer({ doc }) {
   useEffect(() => {
     let cancelled = false;
     const host = pagesRef.current;
-    (async () => {
+    void (async () => {
       try {
         setStatus('loading');
         const pdfjs = await import('pdfjs-dist');

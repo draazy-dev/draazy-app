@@ -11,12 +11,12 @@ public record ModerationFacets(
         Boolean unconfirmed,
         String progress,
         Boolean badge) {
-    public static final Set<String> PROGRESS = Set.of("awaiting_confirmation", "ready", "in_review", "needs_info");
+    public static final Set<String> PROGRESS_STAGES = Set.of("awaiting_confirmation", "ready", "in_review", "needs_info");
 
     public static final ModerationFacets NONE = new ModerationFacets(null, null, null, null, null, null, null);
 
     public ModerationFacets {
-        if (progress != null && !PROGRESS.contains(progress)) {
+        if (progress != null && !PROGRESS_STAGES.contains(progress)) {
             throw new BadRequestException("Unknown progress filter: " + progress);
         }
     }

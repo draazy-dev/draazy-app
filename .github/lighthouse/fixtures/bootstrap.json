@@ -1,0 +1,255 @@
+{
+ "flags": {
+  "signupsEnabled": true,
+  "kycBadgeEnabled": true,
+  "maintenanceMode": false
+ },
+ "geo": {
+  "blacklist": [],
+  "servedDistricts": [
+   "Pune"
+  ],
+  "districtAreas": []
+ },
+ "cities": [
+  {
+   "slug": "pune",
+   "name": "Pune",
+   "live": true,
+   "listingCount": 62
+  },
+  {
+   "slug": "bengaluru",
+   "name": "Bengaluru",
+   "live": false,
+   "listingCount": 0
+  },
+  {
+   "slug": "delhi-ncr",
+   "name": "Delhi NCR",
+   "live": false,
+   "listingCount": 0
+  },
+  {
+   "slug": "hyderabad",
+   "name": "Hyderabad",
+   "live": false,
+   "listingCount": 0
+  },
+  {
+   "slug": "mumbai",
+   "name": "Mumbai",
+   "live": false,
+   "listingCount": 0
+  }
+ ],
+ "pricing": {
+  "listingPass": 999,
+  "listingPassBuy": 1999,
+  "contactPack": 199,
+  "contactPackBuy": 399,
+  "rentAgreementPlatform": 499,
+  "referral": {
+   "seekerBonusContacts": 5,
+   "ownerFeaturedDays": 14,
+   "agreementDiscountPercent": 50,
+   "featuredDays": 7,
+   "qualifyPerMonth": 3,
+   "qualifyPerYear": 10,
+   "holdDays": 7,
+   "clawbackDays": 30,
+   "signupWindowHours": 24
+  },
+  "refunds": {
+   "packRefundDays": 7,
+   "passGuaranteeDays": 7,
+   "passGuaranteeMaxEnquiries": 0,
+   "passGuaranteeEveryMonths": 12,
+   "contactReplyDays": 7
+  }
+ },
+ "listingPolicy": {
+  "maxPhotos": 10
+ },
+ "movePack": {
+  "enabled": false,
+  "items": {
+   "clean": 2500,
+   "paint": 6000,
+   "movers": 8000,
+   "verify": 999,
+   "internet": 500,
+   "agreement": 1500
+  }
+ },
+ "plans": [
+  {
+   "id": "b1000000-0000-4000-8000-000000000006",
+   "name": "Rent Contact Pack",
+   "audience": null,
+   "price": 199,
+   "billingCycle": null,
+   "termDays": 30,
+   "kind": "contact-pack",
+   "deal": "rent",
+   "listingLimit": null,
+   "contactLimit": 15,
+   "features": [
+    "15 owner contacts on rent listings",
+    "Valid for 30 days",
+    "No auto-renewal"
+   ]
+  },
+  {
+   "id": "b1000000-0000-4000-8000-000000000007",
+   "name": "Buy Contact Pack",
+   "audience": null,
+   "price": 399,
+   "billingCycle": null,
+   "termDays": 60,
+   "kind": "contact-pack",
+   "deal": "buy",
+   "listingLimit": null,
+   "contactLimit": 15,
+   "features": [
+    "15 owner contacts on sale listings",
+    "Valid for 60 days",
+    "No auto-renewal"
+   ]
+  },
+  {
+   "id": "b1000000-0000-4000-8000-000000000005",
+   "name": "Rent Listing Pass",
+   "audience": "owner",
+   "price": 999,
+   "billingCycle": null,
+   "termDays": 60,
+   "kind": "listing-pass",
+   "deal": "rent",
+   "listingLimit": null,
+   "contactLimit": null,
+   "features": [
+    "1 extra live rent listing",
+    "Live for 60 days",
+    "No auto-renewal"
+   ]
+  },
+  {
+   "id": "b1000000-0000-4000-8000-000000000008",
+   "name": "Sale Listing Pass",
+   "audience": "owner",
+   "price": 1999,
+   "billingCycle": null,
+   "termDays": 90,
+   "kind": "listing-pass",
+   "deal": "buy",
+   "listingLimit": null,
+   "contactLimit": null,
+   "features": [
+    "1 extra live sale listing",
+    "Live for 90 days",
+    "No auto-renewal"
+   ]
+  }
+ ],
+ "counts": {
+  "counts": [
+   {
+    "category": "commercial",
+    "deal": "buy",
+    "count": 6
+   },
+   {
+    "category": "commercial",
+    "deal": "rent",
+    "count": 6
+   },
+   {
+    "category": "farmland",
+    "deal": "buy",
+    "count": 4
+   },
+   {
+    "category": "farmland",
+    "deal": "rent",
+    "count": 3
+   },
+   {
+    "category": "flat",
+    "deal": "buy",
+    "count": 16
+   },
+   {
+    "category": "flat",
+    "deal": "rent",
+    "count": 5
+   },
+   {
+    "category": "flatmates",
+    "deal": "rent",
+    "count": 8
+   },
+   {
+    "category": "house",
+    "deal": "buy",
+    "count": 3
+   },
+   {
+    "category": "house",
+    "deal": "rent",
+    "count": 2
+   },
+   {
+    "category": "plot",
+    "deal": "buy",
+    "count": 2
+   },
+   {
+    "category": "plot",
+    "deal": "rent",
+    "count": 1
+   },
+   {
+    "category": "villa",
+    "deal": "buy",
+    "count": 4
+   },
+   {
+    "category": "villa",
+    "deal": "rent",
+    "count": 2
+   }
+  ]
+ },
+ "trustStats": {
+  "verifiedListings": 48,
+  "totalListings": 62,
+  "verifiedOwners": 8
+ },
+ "flatmatePulse": {
+  "seeking": 3,
+  "initials": [
+   "YP",
+   "AP",
+   "NK"
+  ],
+  "tabs": {
+   "move-in": 4,
+   "people": 0,
+   "teams": 3
+  },
+  "split": {
+   "locality": "Sangvi",
+   "bhk": 2,
+   "rent": 30000,
+   "seats": 3,
+   "share": 10000
+  }
+ },
+ "legal": {
+  "grievanceOfficer": {
+   "name": "Grievance Officer",
+   "email": "grievance@draazy.com"
+  }
+ }
+}

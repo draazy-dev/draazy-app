@@ -68,7 +68,7 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
                         .content(body(name, locality)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        String id = json.replaceAll(".*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        String id = json.replaceAll("(?m)^.*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
         return publish(id);
     }
 
@@ -183,7 +183,7 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.parking").value("bike"))
                     .andReturn().getResponse().getContentAsString();
-            String id = publish(created.replaceAll(".*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1"));
+            String id = publish(created.replaceAll("(?m)^.*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1"));
 
             mvc.perform(get(Routes.Flatmates.POST_BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(reader)))
                     .andExpect(status().isOk())
@@ -401,7 +401,7 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.verifiedContactOnly").value(true))
                     .andReturn().getResponse().getContentAsString();
-            String id = publish(json.replaceAll(".*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1"));
+            String id = publish(json.replaceAll("(?m)^.*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1"));
 
             mvc.perform(post(Routes.Flatmates.POST_INTEREST, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(requester))
@@ -568,7 +568,7 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
                             .content(facetBody(name, locality, gender, budget)))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();
-            publish(json.replaceAll(".*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1"));
+            publish(json.replaceAll("(?m)^.*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1"));
         }
 
         @Test

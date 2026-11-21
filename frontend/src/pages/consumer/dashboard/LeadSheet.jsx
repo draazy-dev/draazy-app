@@ -22,10 +22,9 @@ export default function LeadSheet({ lead, annotation, onClose, onSaveAnnotation 
 
   const flushNote = async () => {
     const trimmed = noteRef.current.trim();
-    if (lastSavedNote.current === trimmed) return true;
+    if (lastSavedNote.current === trimmed) return;
     await saveRef.current({ note: trimmed });
     lastSavedNote.current = trimmed;
-    return true;
   };
   const saveFollowUp = (v) => {
     setFollowUp(v);

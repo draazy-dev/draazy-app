@@ -81,7 +81,7 @@ export function PaperRow({ item, label = item.name, review, file, onOpen }) {
       {rejecting ? (
         <form
           className="mt-2 flex flex-wrap items-center gap-2 pl-6"
-          onSubmit={(event) => { event.preventDefault(); if (reason.trim()) send('rejected', reason.trim()); }}
+          onSubmit={(event) => { event.preventDefault(); if (reason.trim()) void send('rejected', reason.trim()); }}
         >
           <label className="sr-only" htmlFor={`reject-${item.id}`}>Why is {item.name} rejected?</label>
           <input

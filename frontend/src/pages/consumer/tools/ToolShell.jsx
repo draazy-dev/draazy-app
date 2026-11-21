@@ -14,7 +14,7 @@ const linkCls = 'inline-flex min-h-[44px] items-center gap-1 text-sm font-semibo
 
 export function NumField({ id, label, value, onChange, prefix = '₹', suffix, decimal = false, maxLength = 11 }) {
   const shown = decimal || value === '' ? value : Number(value).toLocaleString('en-IN');
-  const clean = (raw) => (decimal ? raw.replace(/[^\d.]/g, '').replace(/^(\d*\.?\d*).*$/, '$1') : raw.replace(/\D/g, '')).slice(0, maxLength);
+  const clean = (raw) => (decimal ? raw.replace(/[^\d.]/g, '').replace(/^(\d*(?:\.\d*)?).*$/, '$1') : raw.replace(/\D/g, '')).slice(0, maxLength);
   return (
     <div>
       <label htmlFor={id} className={labelCls}>{label}</label>

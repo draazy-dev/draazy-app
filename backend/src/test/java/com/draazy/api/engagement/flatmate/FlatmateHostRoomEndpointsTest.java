@@ -88,7 +88,7 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
                         .content(roomBody(host, locality, society)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        return json.replaceAll("(?m)^.*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
     private String publishedRoom(User host, String locality, String society) throws Exception {
@@ -349,7 +349,7 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
                                     + "{\"roomKind\":\"bedroom\",\"rent\":15000}]}"))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();
-            String roomId = json.replaceAll(".*?\"rooms\"\\s*:\\s*\\[\\s*\\{.*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+            String roomId = json.replaceAll("(?m)^(?:(?!\"rooms\"\\s*:\\s*\\[\\s*\\{).)*+\"rooms\"\\s*:\\s*\\[\\s*\\{.*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
 
             mvc.perform(delete(Routes.Flatmates.ROOM_BY_ID, roomId)
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner)))

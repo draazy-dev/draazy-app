@@ -157,7 +157,7 @@ public class FlatmateReview extends AuditedEntity {
 
     private boolean namesStoredFile(Map<String, Object> doc) {
         return doc != null && this.agreementDoc != null && doc.get("dataUrl") == null
-                && !doc.containsKey(AgreementPeriod.TILL)
+                && !doc.containsKey(AgreementPeriod.TILL_KEY)
                 && doc.get("id") != null && doc.get("id").equals(this.agreementDoc.get("id"));
     }
 

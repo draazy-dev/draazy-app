@@ -1,6 +1,16 @@
 const MON_ABBR = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
 const pad = (n) => String(n).padStart(2, '0');
 
+const parenGroup = (value) => {
+  const s = String(value);
+  for (let open = s.indexOf('('); open !== -1; open = s.indexOf('(', open + 1)) {
+    const close = s.indexOf(')', open + 1);
+    if (close === -1) return '';
+    if (close > open + 1) return s.slice(open + 1, close);
+  }
+  return '';
+};
+
 export const todayIso = () => {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -11,7 +21,7 @@ export function parseWhen(when) {
   const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(when);
   if (iso) return { date: new Date(+iso[1], +iso[2] - 1, +iso[3]), timeLabel: '', mode: '' };
   const timeM = /(\d{1,2}:\d{2})\s*([AP]M)/i.exec(when);
-  const modeM = /\(([^)]+)\)/.exec(when);
+  const modeM = parenGroup(when);
   const dm = /(\d{1,2})\s+([A-Za-z]{3,})(?:\s+(\d{4}))?/.exec(when);
   let date = null;
   if (dm) {
@@ -28,7 +38,7 @@ export function parseWhen(when) {
       }
     }
   }
-  return { date, timeLabel: timeM ? `${timeM[1]} ${timeM[2].toUpperCase()}` : '', mode: modeM ? modeM[1] : '' };
+  return { date, timeLabel: timeM ? `${timeM[1]} ${timeM[2].toUpperCase()}` : '', mode: modeM || '' };
 }
 
 export function displayDate(dateIso) {

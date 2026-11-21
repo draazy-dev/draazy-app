@@ -20,7 +20,7 @@ final class TenantPoliceRecordRules {
     private static final Pattern INTEGER = Pattern.compile("^\\d+$");
     private static final Pattern MOBILE = Pattern.compile("^[6-9]\\d{9}$");
     private static final Pattern WORK_OPTIONAL = Pattern.compile(
-            "(?i).*\\b(student|home\\s*maker|homemaker|housewife|retired)\\b.*");
+            "(?i).*\\b(student|home\\s*maker|housewife|retired)\\b.*");
 
     private TenantPoliceRecordRules() {
     }
@@ -93,8 +93,7 @@ final class TenantPoliceRecordRules {
             length(row.get("fullName"), rowPath + ".fullName", MAX_NAME, problems);
             length(row.get("relation"), rowPath + ".relation", MAX_TEXT, problems);
             whole(row.get("age"), rowPath + ".age", 0, 120, problems);
-            if (isStated(row.get("mobile"))
-                    && !MOBILE.matcher(row.get("mobile").toString().replaceAll("\\D", "")).matches()) {
+            if (isStated(row.get("mobile")) && !MOBILE.matcher(text(row.get("mobile")).replaceAll("\\D", "")).matches()) {
                 problems.add(rowPath + ".mobile must be a 10-digit Indian mobile");
             }
         }

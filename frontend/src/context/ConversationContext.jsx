@@ -103,7 +103,7 @@ export function ConversationProvider({ children }) {
     const sync = () => getAppFlags()
       .then((flags) => { if (alive) setMessagingEnabled(flags?.inAppMessaging !== false); })
       .catch(() => { if (alive) setMessagingEnabled(true); });
-    sync();
+    void sync();
     window.addEventListener('draazy-settings-change', sync);
     window.addEventListener('storage', sync);
     return () => {

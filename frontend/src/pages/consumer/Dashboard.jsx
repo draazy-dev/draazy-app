@@ -54,7 +54,7 @@ export default function Dashboard() {
   const [caps, setCaps] = useState({});
   useEffect(() => {
     let live = true;
-    dashboardCaps(dashboardDoc).then((next) => { if (live) setCaps(next); });
+    void dashboardCaps(dashboardDoc).then((next) => { if (live) setCaps(next); });
     return () => { live = false; };
   }, [dashboardDoc]);
   const { verified } = useVerification();

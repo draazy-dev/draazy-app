@@ -24,7 +24,7 @@ public class ClientErrorService {
 
     private static final Logger log = LoggerFactory.getLogger(ClientErrorService.class);
     private static final Pattern SAFE_TRACE_ID = Pattern.compile("[A-Za-z0-9_-]{1,128}");
-    private static final Pattern POSITIONS = Pattern.compile("(?::\\d+)+");
+    private static final Pattern POSITIONS = Pattern.compile("(?::\\d++)++");
     private static final int MAX_SHORT = 100;
     private static final int MAX_PATH = 300;
     private static final int MAX_STACK = 8_000;

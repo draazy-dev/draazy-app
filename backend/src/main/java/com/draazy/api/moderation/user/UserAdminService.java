@@ -85,7 +85,7 @@ public class UserAdminService {
         this.objectMapper = objectMapper;
         this.identity = identity;
         this.personNames = personNames;
-        this.baseUrl = baseUrl.replaceAll("/+$", "");
+        this.baseUrl = baseUrl.replaceAll("([^/]|^)/++$", "$1");
     }
 
     @Transactional(readOnly = true)

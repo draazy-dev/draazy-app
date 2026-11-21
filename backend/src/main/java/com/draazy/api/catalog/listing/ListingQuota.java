@@ -44,6 +44,7 @@ public class ListingQuota implements ListingLiveGate {
     }
 
     @Override
+    @Transactional
     public boolean mayGoLive(Property property) {
         return mayGoLive(property, Instant.now());
     }

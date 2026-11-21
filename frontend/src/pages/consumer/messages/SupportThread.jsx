@@ -129,7 +129,7 @@ export default function SupportThread({ t, user, contextKey: wanted, opened, onB
 
   useEffect(() => {
     let live = true;
-    loadSupportChoices(user).then((next) => { if (live) setChoices(next); });
+    void loadSupportChoices(user).then((next) => { if (live) setChoices(next); });
     return () => { live = false; };
   }, [user]);
 
@@ -245,7 +245,7 @@ export default function SupportThread({ t, user, contextKey: wanted, opened, onB
                 className="pc-input"
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !isImeComposing(e)) { e.preventDefault(); submit(); } }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !isImeComposing(e)) { e.preventDefault(); void submit(); } }}
                 rows={1}
                 maxLength={4000}
                 enterKeyHint="send"

@@ -79,7 +79,7 @@ const REFUND_FIELDS = [
 ];
 const GRIEVANCE_NAME_MAX = 80;
 const GRIEVANCE_EMAIL_MAX = 120;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@][^\s@.]*\.[^\s@]+$/;
 
 const saveError = (err) => {
   if (err?.status === 412) return 'Someone else changed these settings — reload to see their changes.';
@@ -223,7 +223,7 @@ export default function AdminSettings() {
       toast(`Choose a whole number from ${MIN_PHOTOS_CAP} to ${MAX_PHOTOS_CEILING}.`, 'error');
       return;
     }
-    persist({ listings: { maxPhotos } }, 'Photo limit saved');
+    void persist({ listings: { maxPhotos } }, 'Photo limit saved');
   };
 
   const maxGroups = settings.flatmates?.maxGroupsPerPerson ?? DEFAULT_GROUPS_PER_PERSON;
@@ -233,7 +233,7 @@ export default function AdminSettings() {
       toast(`Choose a whole number from 1 to ${MAX_GROUPS_CEILING}.`, 'error');
       return;
     }
-    persist({ flatmates: { maxGroupsPerPerson: maxGroups } }, 'Group limit saved');
+    void persist({ flatmates: { maxGroupsPerPerson: maxGroups } }, 'Group limit saved');
   };
 
   const movePack = settings.movePack || { enabled: false, items: {} };

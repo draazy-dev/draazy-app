@@ -71,7 +71,7 @@ public class ServiceRequestDocumentReviews {
         }
         UUID document = UUID.fromString(current);
         ServiceRequestDocumentReview row = reviews.findByDocumentId(document).orElseGet(() -> new ServiceRequestDocumentReview(request.getId(), document));
-        row.decide(wanted, ServiceRequestDocumentReview.VERIFIED.equals(wanted) ? null : why,
+        row.decide(wanted, ServiceRequestDocumentReview.VERIFIED_STATE.equals(wanted) ? null : why,
                 caller.userId(), Instant.now());
         reviews.save(row);
         requests.record(request, "document." + wanted, requests.displayName(caller.userId()));
@@ -88,7 +88,7 @@ public class ServiceRequestDocumentReviews {
         if (!ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType())) {
             return;
         }
-        List<String> open = checklistOf(request, caller).items().stream().filter(item -> !ServiceRequestDocumentReview.VERIFIED.equals(item.review())).map(ServiceRequestChecklistDto.Item::name).toList();
+        List<String> open = checklistOf(request, caller).items().stream().filter(item -> !ServiceRequestDocumentReview.VERIFIED_STATE.equals(item.review())).map(ServiceRequestChecklistDto.Item::name).toList();
         if (!open.isEmpty()) {
             String named = String.join(", ", open.subList(0, Math.min(open.size(), NAMED_AT_MOST)));
             String more = open.size() > NAMED_AT_MOST ? " and " + (open.size() - NAMED_AT_MOST) + " more" : "";
@@ -125,7 +125,7 @@ public class ServiceRequestDocumentReviews {
         if (name == null) {
             throw new ValidationException("'" + slug + "' is not on this request's checklist.");
         }
-        if (!ServiceRequestDocumentReview.VERIFIED.equals(verdict)
+        if (!ServiceRequestDocumentReview.VERIFIED_STATE.equals(verdict)
                 && !ServiceRequestDocumentReview.REJECTED.equals(verdict)) {
             throw new ValidationException("verdict must be 'verified' or 'rejected'.");
         }
