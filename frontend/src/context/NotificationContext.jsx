@@ -59,7 +59,7 @@ export function NotificationProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, [refresh]);
 
   useEffect(() => {

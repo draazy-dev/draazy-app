@@ -81,7 +81,7 @@ export default function NotifyMeCard({ filters, locNameBySlug, toast }) {
       const once = `${localitySlug}|${filters.deal}|${demandBhk}`;
       if (signalled.current.has(once)) return;
       signalled.current.add(once);
-      recordSignal({ kind: 'alert', localitySlug, deal: filters.deal, bhk: demandBhk });
+      void recordSignal({ kind: 'alert', localitySlug, deal: filters.deal, bhk: demandBhk });
     });
 
     if (!isIn) {

@@ -165,7 +165,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
   const ownerOfferAct = (id, action) => {
     if (action === 'counter') {
       const v = window.prompt(t('property.counterPrompt'));
-      const a = parseInt(String(v || '').replace(/[^\d]/g, ''), 10);
+      const a = Number.parseInt(String(v || '').replace(/[^\d]/g, ''), 10);
       if (!a) return;
       run(() => respondOffer(id, 'counter', a, { isOwner: true, propId }),
         t('property.counterSent'));

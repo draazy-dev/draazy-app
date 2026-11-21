@@ -40,7 +40,7 @@ export default function useFlatmatesSearch({ tab = TAB_MOVE_IN, filters, page = 
       { signal: ctl.signal, fresh },
     );
 
-    (async () => {
+    void (async () => {
       try {
         const primary = await run(tab, page, size);
         if (!live || mine !== seq.current) return;

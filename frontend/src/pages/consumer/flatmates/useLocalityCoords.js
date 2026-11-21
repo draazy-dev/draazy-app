@@ -17,13 +17,13 @@ const lookup = (name) => {
 const known = (list) => Object.fromEntries(list.filter((n) => centres.has(n)).map((n) => [n, centres.get(n)]));
 
 export function useLocalityCoords(names) {
-  const key = [...new Set(names.filter(Boolean))].sort().join('|');
+  const key = [...new Set(names.filter(Boolean))].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join('|');
   const [coords, setCoords] = useState(() => known(key ? key.split('|') : []));
   useEffect(() => {
     if (!key) return undefined;
     let live = true;
     const list = key.split('|');
-    Promise.all(list.map(lookup)).then(() => { if (live) setCoords(known(list)); });
+    void Promise.all(list.map(lookup)).then(() => { if (live) setCoords(known(list)); });
     return () => { live = false; };
   }, [key]);
   return coords;

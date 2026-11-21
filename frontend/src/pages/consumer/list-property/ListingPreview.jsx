@@ -18,7 +18,10 @@ const fallbackUnitLabel = (unit) => ({
 }[unit] || 'sq.ft');
 
 function sectionsFor(form, t) {
-  const label = (key) => t(`listProperty.fields.${key}`).replace(/\s*\*$/, '');
+  const label = (key) => {
+    const text = t(`listProperty.fields.${key}`);
+    return text.endsWith('*') ? text.slice(0, -1).trimEnd() : text;
+  };
   const opt = (key) => (key ? t(`listProperty.opt.${key}`) : '');
   const rent = form.deal === 'rent';
   const land = isLandType(form.propertyType);

@@ -24,7 +24,7 @@ function toRgb(c) {
   h = h.slice(1);
   if (h.length === 3) h = h.split('').map((x) => x + x).join('');
   if (h.length !== 6) return null;
-  const n = parseInt(h, 16);
+  const n = Number.parseInt(h, 16);
   if (Number.isNaN(n)) return null;
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
 }

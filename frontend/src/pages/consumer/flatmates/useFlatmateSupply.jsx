@@ -147,7 +147,7 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
       next.delete('editGroup');
       return next;
     }, { replace: true });
-    editGroup(editGroupIntent);
+    void editGroup(editGroupIntent);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `editGroup` is.
   }, [editGroupIntent, authLoading, Boolean(user)]);
   useEffect(() => {
@@ -237,7 +237,7 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
     if (!ok) return null;
     const guard = evaluateHostEligibility({ mobile: user ? user.mobile : '', tier: 'identity' });
     if (guard.overCap) { toast(guard.reason, 'error'); return null; }
-    const seats = parseInt(grp.seats, 10) || 2;
+    const seats = Number.parseInt(grp.seats, 10) || 2;
     return {
       title: grp.title.trim(), policy: grp.policy, seatsTotal: seats, ...seatsOpenAfterEdit(seats),
       note: grp.note, time: 'Just now',

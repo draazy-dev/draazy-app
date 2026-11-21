@@ -23,7 +23,7 @@ export default function StepProperty({ step, prop, setP, setProp, setSelectedPro
     if (name !== prop.society) clearPropertyBinding();
     const pincode = picked?.pincode;
     setProp((p) => ({ ...p, society: name, societyId: picked?.id || '', societyNotOnMaps: !!picked?.notOnMaps, ...(pincode ? { pincode } : {}) }));
-    ['society', ...(pincode ? ['pincode'] : [])].forEach(clearErr);
+    ['society', ...(pincode ? ['pincode'] : [])].forEach((k) => clearErr(k));
     const seq = ++societyPickSeq.current;
     if (!picked?.id) {
       onLocalityBusy?.(false);
@@ -31,7 +31,7 @@ export default function StepProperty({ step, prop, setP, setProp, setSelectedPro
     }
     onLocalityBusy?.(true);
     try {
-      const { name: localityName, slug } = await societyLocalityName(picked, Number(picked.lat ?? NaN), Number(picked.lng ?? NaN));
+      const { name: localityName, slug } = await societyLocalityName(picked, Number(picked.lat ?? Number.NaN), Number(picked.lng ?? Number.NaN));
       const hit = await activeLocality(localityName, slug);
       if (!hit || seq !== societyPickSeq.current || localityPickedAt.current === seq) return;
       setProp((p) => ({ ...p, locality: hit.name }));

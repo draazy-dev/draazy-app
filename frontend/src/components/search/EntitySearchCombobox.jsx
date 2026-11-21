@@ -227,7 +227,7 @@ export default function EntitySearchCombobox({
     }
   };
 
-  const pickRow = (row) => { if (row?.kind === 'place') pickPlace(row); else addToken(row); };
+  const pickRow = (row) => { if (row?.kind === 'place') void pickPlace(row); else addToken(row); };
 
   useEffect(() => { setActiveIdx(-1); }, [query, tokens, open]);
   useEffect(() => {
@@ -269,7 +269,7 @@ export default function EntitySearchCombobox({
 
   return (
     <div ref={wrapRef} className={'entity-search-combobox relative ' + className}>
-      <div onClick={focusInput} className="flex items-center flex-wrap gap-1.5 bg-white/5 rounded-xl px-3 py-2 min-h-[48px] cursor-text">
+      <div role="presentation" onClick={focusInput} className="flex items-center flex-wrap gap-1.5 bg-white/5 rounded-xl px-3 py-2 min-h-[48px] cursor-text">
         <Icon name="search" className="w-5 h-5 text-teal-500 flex-shrink-0" />
         {tokens.map((token) => (
           <span key={`${token.kind}:${token.id}`} className="loc-chip">

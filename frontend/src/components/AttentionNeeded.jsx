@@ -84,7 +84,7 @@ export default function AttentionNeeded({ request, onChanged }) {
                     className="sr-only"
                     disabled={!!uploading}
                     aria-label={`Upload a new copy of ${paper.name}`}
-                    onChange={(event) => { upload(paper, event.target.files?.[0]); event.target.value = ''; }}
+                    onChange={(event) => { void upload(paper, event.target.files?.[0]); event.target.value = ''; }}
                   />
                 </label>
               )}

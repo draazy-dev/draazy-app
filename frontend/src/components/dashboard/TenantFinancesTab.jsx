@@ -309,7 +309,7 @@ function Hero() {
 
 const Row = ({ label, value, valueCls = 'text-white', big }) => (
   <div className="flex items-center justify-between gap-3">
-    <span className={'text-gray-400 ' + (big ? 'text-sm' : 'text-sm')}>{label}</span>
+    <span className="text-gray-400 text-sm">{label}</span>
     <span className={(big ? 'text-lg ' : 'text-sm ') + 'font-semibold ' + valueCls}>{value}</span>
   </div>
 );

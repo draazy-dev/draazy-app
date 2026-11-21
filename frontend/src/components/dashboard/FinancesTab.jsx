@@ -67,7 +67,7 @@ function OwnerFinances({ listings, toast }) {
   useEffect(() => {
     if (!finProp) { setFin(EMPTY); return undefined; }
     let alive = true;
-    Promise.all([
+    void Promise.all([
       getBasis(finProp).catch(() => null),
       listTransactions(finProp).catch(() => ({ items: [] })),
       duesApi(finProp).catch(() => []),
@@ -90,7 +90,7 @@ function OwnerFinances({ listings, toast }) {
   useEffect(() => {
     if (!finProp) { setSummary(EMPTY_SUMMARY); return undefined; }
     let alive = true;
-    financeSummary(finProp, finPeriod)
+    void financeSummary(finProp, finPeriod)
       .catch(() => EMPTY_SUMMARY)
       .then((row) => { if (alive) setSummary(row || EMPTY_SUMMARY); });
     return () => { alive = false; };
@@ -175,7 +175,7 @@ function OwnerFinances({ listings, toast }) {
 
   const singleFlight = useSingleFlight();
   const submitTx = () => singleFlight(async () => {
-    const amount = parseFloat(txForm.amount);
+    const amount = Number.parseFloat(txForm.amount);
     const errors = {
       ...(txForm.category ? {} : { category: t('fin.pickCategory') }),
       ...(amount > 0 ? {} : { amount: t('fin.enterAmount') }),
@@ -231,9 +231,9 @@ function OwnerFinances({ listings, toast }) {
     let saved;
     try {
       saved = await setBasis(finProp, {
-        purchasePrice: parseFloat(basisForm.purchasePrice) || 0,
+        purchasePrice: Number.parseFloat(basisForm.purchasePrice) || 0,
         purchaseDate: basisForm.purchaseDate,
-        currentValue: parseFloat(basisForm.currentValue) || 0,
+        currentValue: Number.parseFloat(basisForm.currentValue) || 0,
       });
     } catch (err) {
       toast(userMessage(err, t('fin.basisSaved')), 'error');

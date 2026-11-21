@@ -316,7 +316,7 @@ export default function useListProperty() {
     // Rooms never show or use the quota; a mode toggle reuses the one already read for this user.
     if (isFlatmateMode || quotaUser.current === user) return undefined;
     quotaUser.current = user;
-    loadWizardQuota().then((q) => {
+    void loadWizardQuota().then((q) => {
       if (quotaUser.current === user) setQuota(q);
     });
     return undefined;

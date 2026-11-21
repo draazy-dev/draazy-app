@@ -55,7 +55,7 @@ const PACK = [
 ];
 const STAT_BAND = [
   { to: Number(STATS.localityGuides), slug: 'localityGuides' },
-  { to: parseInt(STATS.otpVerified, 10), suffix: '%', slug: 'otpVerified' },
+  { to: Number.parseInt(STATS.otpVerified, 10), suffix: '%', slug: 'otpVerified' },
   { to: SERVICES.length, slug: 'underOneRoof' },
   { to: 0, prefix: '₹', slug: 'brokerageCharged' },
 ];

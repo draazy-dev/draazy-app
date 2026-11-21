@@ -21,7 +21,7 @@ export default function Modal({ open, onClose, title, children, footer, size = '
 
   return createPortal(
     <div className="fixed inset-0 z-[1550] flex items-end justify-center px-[var(--dz-float-edge)] pt-[var(--dz-float-top)] pb-[var(--dz-float-bottom)] sm:items-center sm:p-4">
-      <div className="dz-float-scrim absolute inset-0 sm:bg-black/75 sm:backdrop-blur-md" onClick={onClose} />
+      <div className="dz-float-scrim absolute inset-0 sm:bg-black/75 sm:backdrop-blur-md" role="presentation" onClick={onClose} />
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
       <div
         ref={panelRef}

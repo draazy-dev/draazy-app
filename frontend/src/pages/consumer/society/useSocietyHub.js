@@ -119,7 +119,7 @@ export function useSocietyHub() {
       toast(now ? `Following ${soc.name} — we'll alert you on new listings` : 'Unfollowed', now ? 'success' : 'info');
     };
     if (soc._generic || !requireLogin(follow)) return;
-    follow();
+    void follow();
   };
   const myReview = reviews.find((r) => r.mine);
   const reloadReviews = () => Promise.all([

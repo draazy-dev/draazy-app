@@ -14,7 +14,7 @@ const draftKey = (userId, threadId) => `dzMsgDraft:${userId || 'anon'}:${threadI
 const INPUT_MAX_HEIGHT = 120;
 const hasPrivateContact = (text) =>
   /(^|[^\d])(?:\+?91[\s.-]*|0[\s.-]*)?[6-9](?:[\s.-]*\d){9}(?![\s.-]*\d)/.test(text)
-  || /[^\s@]+@[^\s@]+\.[^\s@]+/.test(text);
+  || /[^\s@]@[^\s@][^\s@.]*\.[^\s@]/.test(text);
 const PHOTO_TYPES = ['image/jpeg', 'image/png'];
 const PHOTO_MAX = 8_000_000;
 

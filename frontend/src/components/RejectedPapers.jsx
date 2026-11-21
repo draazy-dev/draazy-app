@@ -52,7 +52,7 @@ export default function RejectedPapers({ requestId, onUploaded }) {
                 className="sr-only"
                 disabled={!!busy}
                 aria-label={`Upload a new copy of ${it.name}`}
-                onChange={(event) => { upload(it, event.target.files?.[0]); event.target.value = ''; }}
+                onChange={(event) => { void upload(it, event.target.files?.[0]); event.target.value = ''; }}
               />
             </label>
           </li>

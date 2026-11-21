@@ -207,7 +207,7 @@ export default function VerifyIdentity() {
         setSelfieHintKey('unavailable');
       }
     }
-    boot();
+    void boot();
     return () => {
       cancelled = true;
       clearLocalTimers();

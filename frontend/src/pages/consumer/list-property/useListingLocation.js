@@ -134,7 +134,7 @@ export default function useListingLocation({ setForm, formRef, errors, setErrors
     const edited = userEditedRef.current;
     const fills = {};
     if (onlyFields.includes('locality') && !edited.locality) {
-      bindLocality(geo.localityRaw, '', replace).then((bound) => {
+      void bindLocality(geo.localityRaw, '', replace).then((bound) => {
         if (bound) setGeoFillStatus('done');
       });
     }
@@ -180,9 +180,9 @@ export default function useListingLocation({ setForm, formRef, errors, setErrors
     placePin(lat, lng, source);
     setFlyTo([lat, lng]);
     if (geo) {
-      applyPlaceFill(lat, lng, geo, replace);
+      void applyPlaceFill(lat, lng, geo, replace);
     } else {
-      autofillFromPin(lat, lng, replace);
+      void autofillFromPin(lat, lng, replace);
     }
   };
   const onLocalityChange = (v, coords) => {
@@ -195,7 +195,7 @@ export default function useListingLocation({ setForm, formRef, errors, setErrors
   };
   const onPinMove = (lat, lng) => {
     placePin(lat, lng, 'manual');
-    autofillFromPin(lat, lng);
+    void autofillFromPin(lat, lng);
     setCurrentLocationStatus('');
   };
   const runMapSearch = async () => {
@@ -219,7 +219,7 @@ export default function useListingLocation({ setForm, formRef, errors, setErrors
     setMapSearchStatus('');
     placePin(details.lat, details.lng, 'map');
     setFlyTo([details.lat, details.lng]);
-    applyPlaceFill(details.lat, details.lng, details, true);
+    void applyPlaceFill(details.lat, details.lng, details, true);
   };
 
   const fillFromSocietyPin = async (lat, lng, gaps, seq) => {
@@ -287,8 +287,8 @@ export default function useListingLocation({ setForm, formRef, errors, setErrors
     }
     clearErrors(['societyId', ...Object.keys(fills), ...(hasPin ? ['location'] : [])]);
     setSocietyFillNotice(society.name ? { name: society.name, fields: [...new Set(filled)] } : null);
-    if (pinGaps.length) fillFromSocietyPin(lat, lng, pinGaps, seq);
-    followSocietyLocality(society, lat, lng, seq);
+    if (pinGaps.length) void fillFromSocietyPin(lat, lng, pinGaps, seq);
+    void followSocietyLocality(society, lat, lng, seq);
   };
 
   const onSocietyPick = (picked) => {

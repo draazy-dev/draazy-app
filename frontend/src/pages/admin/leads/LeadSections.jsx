@@ -35,7 +35,7 @@ export function ProfileSection({ lead, editable, onEdit }) {
 export function InterestsSection({ lead, editable, busy, onSave }) {
   const [draft, setDraft] = useState(null);
   const current = draft ?? lead.interests;
-  const dirty = draft !== null && [...draft].sort().join() !== [...lead.interests].sort().join();
+  const dirty = draft !== null && [...draft].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join() !== [...lead.interests].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join();
 
   if (!editable) {
     return (

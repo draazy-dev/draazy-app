@@ -2,7 +2,7 @@ export const MIN_FONT_PX = 12;
 
 const ROOT_PX = 16;
 
-const ABSOLUTE = /^\s*(-?\d*\.?\d+)(px|rem)\s*$/;
+const ABSOLUTE = /^\s*(-?(?:\d+(?:\.\d+)?|\.\d+))(px|rem)\s*$/;
 
 function measure(value) {
   const m = ABSOLUTE.exec(value);
